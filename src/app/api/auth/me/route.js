@@ -29,7 +29,16 @@ export async function GET(req) {
     let userCompanyName = '';
     let userOrgId = null;
     let userGstin = '';
-    let userEnabledModules = ['leads', 'deals', 'contacts', 'tasks', 'emails', 'calls', 'meetings', 'products', 'quotations', 'invoices', 'reports', 'analytics', 'users', 'roles', 'teams', 'real-estate'];
+    let userEnabledModules = ['leads', 'deals', 'contacts', 'tasks', 'emails', 'calls', 'meetings', 'products', 'quotations', 'invoices', 'reports', 'analytics', 'users', 'roles', 'teams'];
+
+    let userSectorId = 'SOFTWARE_SERVICES';
+    let userSectorName = 'Software Services';
+    let sectorConfig = {
+      leadTerm: 'Lead',
+      productTerm: 'Product',
+      dealTerm: 'Deal',
+      pipelineStages: ['Lead Capture', 'Demo Call', 'Negotiation', 'Won', 'Lost']
+    };
 
     // 2. FRESH FETCH FROM DB
     if (supabase) {
@@ -51,11 +60,11 @@ export async function GET(req) {
         userIsSuperAdmin = data.is_super_admin || data.role === 'superadmin';
         userOrgId = data.org_id;
 
-        // Fetch organization name
+        // Fetch organization details
         if (data.org_id && !data.is_super_admin) {
           const { data: orgData, error: orgError } = await supabase
             .from('organizations')
-            .select('name, enabled_modules, gstin')
+            .select('name, enabled_modules, gstin, sector')
             .eq('id', data.org_id)
             .maybeSingle();
           if (orgError) {
@@ -64,6 +73,25 @@ export async function GET(req) {
             userCompanyName = orgData.name;
             userEnabledModules = orgData.enabled_modules || [];
             userGstin = orgData.gstin || '';
+            const sectorIdVal = orgData.sector || 'SOFTWARE_SERVICES';
+
+            // Fetch sector config details
+            const { data: sectData } = await supabase
+              .from('saas_sectors_config')
+              .select('*')
+              .eq('id', sectorIdVal)
+              .maybeSingle();
+
+            if (sectData) {
+              userSectorId = sectData.id;
+              userSectorName = sectData.name;
+              sectorConfig = {
+                leadTerm: sectData.lead_term || 'Lead',
+                productTerm: sectData.product_term || 'Product',
+                dealTerm: sectData.deal_term || 'Deal',
+                pipelineStages: sectData.pipeline_stages || []
+              };
+            }
           }
         }
       }
@@ -89,9 +117,6 @@ export async function GET(req) {
       );
     }
 
-    if (userIsSuperAdmin && !userEnabledModules.includes('real-estate')) {
-      userEnabledModules.push('real-estate');
-    }
     return NextResponse.json({
       authenticated: true,
       user: {
@@ -104,6 +129,9 @@ export async function GET(req) {
         orgId: userOrgId,
         enabledModules: userEnabledModules,
         gstin: userGstin,
+        sectorId: userSectorId,
+        sectorName: userSectorName,
+        sectorConfig,
       },
     });
   } catch (error) {

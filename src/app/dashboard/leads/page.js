@@ -927,7 +927,7 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Users className="h-7 w-7 text-emerald-500" />
-            {currentUser?.role === 'sales_rep' ? 'My Leads Directory' : 'Corporate Leads Directory'}
+            {currentUser?.role === 'sales_rep' ? `My ${currentUser?.sectorConfig?.leadTerm || 'Lead'}s Directory` : `Corporate ${currentUser?.sectorConfig?.leadTerm || 'Lead'}s Directory`}
           </h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">
             Standard enterprise rules: strict duplicate filters, follow-up calendar alerts, and automated audit tracking.
@@ -968,7 +968,7 @@ export default function LeadsPage() {
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold shadow-md shadow-emerald-500/10 active:scale-[0.98] transition cursor-pointer"
           >
             <Plus className="h-4.5 w-4.5 stroke-[3]" />
-            Create Lead
+            Create {currentUser?.sectorConfig?.leadTerm || 'Lead'}
           </button>
         </div>
       </div>
@@ -978,7 +978,7 @@ export default function LeadsPage() {
         {/* Total Leads */}
         <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Total Leads Pool</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Total {currentUser?.sectorConfig?.leadTerm || 'Lead'}s Pool</span>
             <span className="text-2xl font-black text-slate-800 block mt-1">{totalLeadsCount}</span>
           </div>
           <div className="h-10 w-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
@@ -1136,7 +1136,7 @@ export default function LeadsPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 mb-4 shadow-sm">
               <Users className="h-6 w-6 text-slate-400" />
             </div>
-            <h3 className="text-sm font-bold text-slate-800">No leads found</h3>
+            <h3 className="text-sm font-bold text-slate-800">No {currentUser?.sectorConfig?.leadTerm || 'Lead'}s found</h3>
             <p className="text-xs text-slate-500 max-w-xs mt-1 font-medium">
               Try adjusting filters or importing a CSV campaign to load data.
             </p>
@@ -1146,7 +1146,7 @@ export default function LeadsPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="px-6 py-4">Lead Name</th>
+                  <th className="px-6 py-4">{currentUser?.sectorConfig?.leadTerm || 'Lead'} Name</th>
                   <th className="px-6 py-4">Company & Designation</th>
                   <th className="px-6 py-4">Priority & Warning</th>
                   <th className="px-6 py-4">Status</th>
@@ -1302,7 +1302,7 @@ export default function LeadsPage() {
             <span>
               Showing <strong className="text-slate-700">{indexOfFirstItem + 1}</strong> to{' '}
               <strong className="text-slate-700">{Math.min(indexOfLastItem, leads.length)}</strong> of{' '}
-              <strong className="text-slate-700">{leads.length}</strong> leads
+              <strong className="text-slate-700">{leads.length}</strong> {currentUser?.sectorConfig?.leadTerm || 'Lead'}s
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -1451,7 +1451,7 @@ export default function LeadsPage() {
                         <option value="Contacted">Contacted</option>
                         <option value="Attempted">Attempted Contact</option>
                         <option value="Qualified">Qualified</option>
-                        <option value="Converted">Converted (Healthcare Patient)</option>
+                        <option value="Converted">Converted</option>
                         <option value="Lost">Lost</option>
                         <option value="Future">Contact in Future</option>
                       </select>

@@ -61,6 +61,26 @@ export async function POST(req, { params }) {
 
       const targetAssignedTo = lead.assigned_to || decodedUser.id;
 
+      // Fetch dynamic first pipeline stage of the sector
+      let firstStage = 'Prospecting';
+      if (lead.org_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('sector')
+          .eq('id', lead.org_id)
+          .maybeSingle();
+        if (orgData && orgData.sector) {
+          const { data: sectorConfig } = await supabase
+            .from('saas_sectors_config')
+            .select('pipeline_stages')
+            .eq('id', orgData.sector)
+            .maybeSingle();
+          if (sectorConfig && sectorConfig.pipeline_stages && sectorConfig.pipeline_stages.length > 0) {
+            firstStage = sectorConfig.pipeline_stages[0];
+          }
+        }
+      }
+
       // 1. Create the Deal card in Supabase
       const { data: newDeal, error: dealError } = await supabase
         .from('deals')
@@ -68,7 +88,7 @@ export async function POST(req, { params }) {
           {
             title: dealTitle.trim(),
             value: Number(dealValue),
-            stage: 'Prospecting', // New deals start at Prospecting stage
+            stage: firstStage, // Dynamically set first pipeline stage of the sector
             closing_date: new Date(closingDate).toISOString(),
             lead_id: lead.id,
             assigned_to: targetAssignedTo, // Assign to current rep or owner

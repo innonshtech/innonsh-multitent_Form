@@ -116,7 +116,8 @@ export async function POST(req) {
       proposalFile,
       proposalFileData,
       proposalFileMimeType,
-      channel = 'email'
+      channel = 'email',
+      cc = ''
     } = body;
 
     if (!subject || !subject.trim()) {
@@ -191,7 +192,8 @@ export async function POST(req) {
         downloads_count: 0,
         downloaded_at: [],
         replied: false,
-        reply_body: ''
+        reply_body: '',
+        cc: cc || ''
       };
 
       const { data: newEmail, error: insertError } = await supabase
@@ -237,7 +239,8 @@ export async function POST(req) {
             toName: recipientName,
             subject: newEmail.subject,
             body: newEmail.body,
-            proposalFile: newEmail.proposal_file
+            proposalFile: newEmail.proposal_file,
+            cc: newEmail.cc
           });
         } catch (mailErr) {
           console.error('SMTP real delivery exception caught in route:', mailErr);
@@ -302,7 +305,8 @@ export async function POST(req) {
         proposalFile: proposalFile || '',
         proposalFileData: proposalFileData || '',
         proposalFileMimeType: proposalFileMimeType || '',
-        channel
+        channel,
+        cc: cc || ''
       });
 
       const channelLabel = channel === 'whatsapp' ? 'WhatsApp' : (channel === 'both' ? 'Email & WhatsApp' : 'Email');
@@ -348,7 +352,8 @@ export async function POST(req) {
             toName: recipientName,
             subject: email.subject,
             body: email.body,
-            proposalFile: email.proposalFile
+            proposalFile: email.proposalFile,
+            cc: email.cc
           });
         } catch (mailErr) {
           console.error('SMTP real delivery exception caught in route:', mailErr);
@@ -372,6 +377,70 @@ export async function POST(req) {
     console.error('Send email API error:', error);
     return NextResponse.json(
       { error: 'Internal server error while sending email.', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/emails - Delete selected email logs
+export async function DELETE(req) {
+  try {
+    const decodedUser = getUserFromRequest(req);
+
+    if (!decodedUser) {
+      return NextResponse.json({ error: 'Unauthorized. Please login.' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { ids } = body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'Please select valid email logs to delete.' }, { status: 400 });
+    }
+
+    if (supabase) {
+      let queryBuilder = supabase
+        .from('emails')
+        .delete()
+        .in('id', ids);
+
+      // Role-based access control: sales reps can only delete their own logs
+      if (decodedUser.role === 'sales_rep') {
+        queryBuilder = queryBuilder.eq('sent_by', decodedUser.id);
+      }
+
+      const { data, error } = await queryBuilder;
+
+      if (error) {
+        console.error('Supabase delete emails error:', error);
+        throw error;
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Selected email campaign logs deleted successfully.'
+      });
+    } else {
+      await connectToDatabase();
+
+      let query = { _id: { $in: ids } };
+
+      // Role-based access control: sales reps can only delete their own logs
+      if (decodedUser.role === 'sales_rep') {
+        query.sentBy = decodedUser.id;
+      }
+
+      const result = await Email.deleteMany(query);
+
+      return NextResponse.json({
+        success: true,
+        message: `Selected email campaign logs deleted successfully. Total removed: ${result.deletedCount}`
+      });
+    }
+  } catch (error) {
+    console.error('Delete emails API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error while deleting email campaign logs.', details: error.message },
       { status: 500 }
     );
   }

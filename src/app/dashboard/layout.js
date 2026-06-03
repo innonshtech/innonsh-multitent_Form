@@ -116,32 +116,6 @@ export default function DashboardLayout({ children }) {
     '/dashboard/users': 'users',
     '/dashboard/roles': 'roles',
     '/dashboard/teams': 'teams',
-    '/dashboard/real-estate': 'real-estate',
-    '/dashboard/real-estate/leads': 'real-estate',
-    '/dashboard/real-estate/contacts': 'real-estate',
-    '/dashboard/real-estate/properties': 'real-estate',
-    '/dashboard/real-estate/projects': 'real-estate',
-    '/dashboard/real-estate/units': 'real-estate',
-    '/dashboard/real-estate/visits': 'real-estate',
-    '/dashboard/real-estate/matching': 'real-estate',
-    '/dashboard/real-estate/bookings': 'real-estate',
-    '/dashboard/real-estate/payments': 'real-estate',
-    '/dashboard/real-estate/partners': 'real-estate',
-    '/dashboard/real-estate/blocking': 'real-estate',
-    '/dashboard/real-estate/documents': 'real-estate',
-    '/dashboard/real-estate/possessions': 'real-estate',
-    '/dashboard/healthcare': 'healthcare',
-    '/dashboard/healthcare/leads': 'healthcare',
-    '/dashboard/healthcare/patients': 'healthcare',
-    '/dashboard/healthcare/appointments': 'healthcare',
-    '/dashboard/healthcare/doctors': 'healthcare',
-    '/dashboard/healthcare/records': 'healthcare',
-    '/dashboard/healthcare/prescriptions': 'healthcare',
-    '/dashboard/healthcare/lab-tests': 'healthcare',
-    '/dashboard/healthcare/admissions': 'healthcare',
-    '/dashboard/healthcare/billing': 'healthcare',
-    '/dashboard/healthcare/claims': 'healthcare',
-    '/dashboard/healthcare/pharmacy': 'healthcare',
   };
 
   const activeModuleKey = Object.keys(moduleMapping).find(
@@ -152,15 +126,20 @@ export default function DashboardLayout({ children }) {
   const isModuleDisabled = activeModuleName && user && !user.isSuperAdmin && user.enabledModules && !user.enabledModules.includes(activeModuleName);
 
   const getModuleDisplayName = (slug) => {
+    const sectorConf = user?.sectorConfig;
+    const leadTerm = sectorConf?.leadTerm || 'Lead';
+    const productTerm = sectorConf?.productTerm || 'Product';
+    const dealTerm = sectorConf?.dealTerm || 'Deal';
+
     switch (slug) {
-      case 'leads': return 'Leads Directory';
+      case 'leads': return `${leadTerm} Directory`;
       case 'contacts': return 'Contacts Directory';
-      case 'deals': return 'Deals Pipeline';
+      case 'deals': return `${dealTerm} Pipeline`;
       case 'emails': return 'Email Hub';
       case 'tasks': return 'Tasks Manager & Reminders';
       case 'calls': return 'Call Logs & Record Suite';
       case 'meetings': return 'Meetings & Calendar Scheduler';
-      case 'products': return 'Products Catalogue';
+      case 'products': return `${productTerm}s Catalogue`;
       case 'quotations': return 'Quotations Builder';
       case 'invoices': return 'Invoices & Billing Hub';
       case 'reports': return 'Sales Reports Builder';
@@ -168,7 +147,6 @@ export default function DashboardLayout({ children }) {
       case 'users': return 'Users & Employee Directory';
       case 'roles': return 'Roles & Permission Gates';
       case 'teams': return 'Teams & Department Manager';
-      case 'healthcare': return 'Healthcare Suite';
       case 'support': return 'Customer Support';
       default: return slug.charAt(0).toUpperCase() + slug.slice(1);
     }
@@ -357,41 +335,6 @@ export default function DashboardLayout({ children }) {
       ]
     },
     {
-      title: 'Real Estate Spec',
-      links: [
-        { name: 'RE Overview', href: '/dashboard/real-estate', icon: Building2 },
-        { name: 'RE Leads', href: '/dashboard/real-estate/leads', icon: Users },
-        { name: 'RE Contacts', href: '/dashboard/real-estate/contacts', icon: UserCheck },
-        { name: 'Properties', href: '/dashboard/real-estate/properties', icon: Building },
-        { name: 'Projects', href: '/dashboard/real-estate/projects', icon: Layers },
-        { name: 'Unit Inventory', href: '/dashboard/real-estate/units', icon: Lock },
-        { name: 'Site Visits', href: '/dashboard/real-estate/visits', icon: MapPin },
-        { name: 'Property Matching', href: '/dashboard/real-estate/matching', icon: Search },
-        { name: 'Bookings', href: '/dashboard/real-estate/bookings', icon: BookOpen },
-        { name: 'Payment Plans', href: '/dashboard/real-estate/payments', icon: CreditCard },
-        { name: 'Channel Partners', href: '/dashboard/real-estate/partners', icon: Handshake },
-        { name: 'Blocking', href: '/dashboard/real-estate/blocking', icon: Ban },
-        { name: 'Documents Vault', href: '/dashboard/real-estate/documents', icon: FolderOpen },
-        { name: 'Possessions', href: '/dashboard/real-estate/possessions', icon: KeyRound },
-      ]
-    },
-    {
-      title: 'Healthcare Spec',
-      links: [
-        { name: 'Patient Prospects', href: '/dashboard/healthcare/leads', icon: Sparkles },
-        { name: 'Patients', href: '/dashboard/healthcare/patients', icon: Users },
-        { name: 'Appointments', href: '/dashboard/healthcare/appointments', icon: Calendar },
-        { name: 'Doctors', href: '/dashboard/healthcare/doctors', icon: UserCog },
-        { name: 'Medical Records', href: '/dashboard/healthcare/records', icon: FileText },
-        { name: 'Prescriptions', href: '/dashboard/healthcare/prescriptions', icon: Heart },
-        { name: 'Lab Tests', href: '/dashboard/healthcare/lab-tests', icon: Activity },
-        { name: 'Admissions', href: '/dashboard/healthcare/admissions', icon: Building },
-        { name: 'Billing', href: '/dashboard/healthcare/billing', icon: Receipt },
-        { name: 'Insurance Claims', href: '/dashboard/healthcare/claims', icon: ShieldAlert },
-        { name: 'Pharmacy', href: '/dashboard/healthcare/pharmacy', icon: Package },
-      ]
-    },
-    {
       title: 'Activities',
       links: [
         { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare },
@@ -576,13 +519,33 @@ export default function DashboardLayout({ children }) {
               const Icon = link.icon;
               const isActive = pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(link.href + '/'));
               
-              // Dynamic Display Names for Sales Representative
+              // Dynamic Display Names translated by Active Sector Config
               let displayName = link.name;
-              if (user?.role === 'sales_rep') {
-                if (link.name === 'Leads Directory') displayName = 'My Leads';
-                if (link.name === 'Contacts Directory') displayName = 'My Contacts';
-                if (link.name === 'Deals Pipeline') displayName = 'My Deals';
-                if (link.name === 'Tasks') displayName = 'My Tasks';
+              const sectorConf = user?.sectorConfig;
+              
+              if (sectorConf) {
+                const leadTerm = sectorConf.leadTerm || 'Lead';
+                const productTerm = sectorConf.productTerm || 'Product';
+                const dealTerm = sectorConf.dealTerm || 'Deal';
+
+                if (link.name === 'Leads Directory') {
+                  displayName = user?.role === 'sales_rep' ? `My ${leadTerm}s` : `${leadTerm} Directory`;
+                } else if (link.name === 'Deals Pipeline') {
+                  displayName = user?.role === 'sales_rep' ? `My ${dealTerm}s` : `${dealTerm} Pipeline`;
+                } else if (link.name === 'Products') {
+                  displayName = `${productTerm}s`;
+                } else if (link.name === 'Contacts Directory' && user?.role === 'sales_rep') {
+                  displayName = 'My Contacts';
+                } else if (link.name === 'Tasks' && user?.role === 'sales_rep') {
+                  displayName = 'My Tasks';
+                }
+              } else {
+                if (user?.role === 'sales_rep') {
+                  if (link.name === 'Leads Directory') displayName = 'My Leads';
+                  if (link.name === 'Contacts Directory') displayName = 'My Contacts';
+                  if (link.name === 'Deals Pipeline') displayName = 'My Deals';
+                  if (link.name === 'Tasks') displayName = 'My Tasks';
+                }
               }
               
               return (

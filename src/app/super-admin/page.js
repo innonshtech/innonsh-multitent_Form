@@ -24,7 +24,11 @@ import {
   ChevronRight,
   TrendingUp,
   Tag,
-  CircleDot
+  CircleDot,
+  Plus,
+  Trash2,
+  Edit,
+  X
 } from 'lucide-react';
 
 export default function SuperAdminDashboard() {
@@ -41,6 +45,17 @@ export default function SuperAdminDashboard() {
   const [subscriptions, setSubscriptions] = useState([]);
   const [moduleRequests, setModuleRequests] = useState([]);
 
+  // Sectors CRUD States
+  const [sectorsModalOpen, setSectorsModalOpen] = useState(false);
+  const [editingSector, setEditingSector] = useState(null);
+  const [sectorId, setSectorId] = useState('');
+  const [sectorName, setSectorName] = useState('');
+  const [sectorLeadTerm, setSectorLeadTerm] = useState('');
+  const [sectorProductTerm, setSectorProductTerm] = useState('');
+  const [sectorDealTerm, setSectorDealTerm] = useState('');
+  const [sectorStages, setSectorStages] = useState([]);
+  const [newStageInput, setNewStageInput] = useState('');
+
   // UI States
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +67,8 @@ export default function SuperAdminDashboard() {
   const [selectedOrgForModules, setSelectedOrgForModules] = useState(null);
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [checkedModules, setCheckedModules] = useState([]);
+  const [expandedSectorId, setExpandedSectorId] = useState(null);
+  const [selectedSectorId, setSelectedSectorId] = useState(null);
 
   const fetchModuleRequests = async () => {
     try {
@@ -105,7 +122,6 @@ export default function SuperAdminDashboard() {
     { key: 'roles', name: 'Roles & Permissions', desc: 'Privilege gates and dynamic auth controls' },
     { key: 'teams', name: 'Sales Teams', desc: 'Manage regional sales teams and leaders' },
     { key: 'real-estate', name: 'Real Estate Suite', desc: 'Properties inventory, matching engines, site visits scheduler, holds and milestones builder' },
-    { key: 'healthcare', name: 'Healthcare Suite', desc: 'Comprehensive patient directory, doctors scheduler, medical records, billing, pharmacy and claims tracker' },
   ];
 
   const handleOpenModulesModal = (org) => {
@@ -149,6 +165,105 @@ export default function SuperAdminDashboard() {
   const showToast = (text) => {
     setToastText(text);
     setTimeout(() => setToastText(''), 3000);
+  };
+
+  // Sectors CRUD Handlers
+  const openAddSectorModal = () => {
+    setEditingSector(null);
+    setSectorId('');
+    setSectorName('');
+    setSectorLeadTerm('Lead');
+    setSectorProductTerm('Product');
+    setSectorDealTerm('Deal');
+    setSectorStages(['Lead Capture', 'Demo Call', 'Negotiation', 'Won', 'Lost']);
+    setNewStageInput('');
+    setSectorsModalOpen(true);
+  };
+
+  const openEditSectorModal = (sector) => {
+    setEditingSector(sector);
+    setSectorId(sector.id);
+    setSectorName(sector.name);
+    setSectorLeadTerm(sector.lead_term);
+    setSectorProductTerm(sector.product_term);
+    setSectorDealTerm(sector.deal_term);
+    setSectorStages(sector.pipeline_stages || []);
+    setNewStageInput('');
+    setSectorsModalOpen(true);
+  };
+
+  const handleAddStage = () => {
+    if (!newStageInput.trim()) return;
+    if (sectorStages.includes(newStageInput.trim())) return;
+    setSectorStages([...sectorStages, newStageInput.trim()]);
+    setNewStageInput('');
+  };
+
+  const handleRemoveStage = (stageToRemove) => {
+    setSectorStages(sectorStages.filter(s => s !== stageToRemove));
+  };
+
+  const handleSaveSector = async (e) => {
+    e.preventDefault();
+    if (!sectorId || !sectorName || !sectorLeadTerm || !sectorProductTerm || !sectorDealTerm) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+    setActionLoading(sectorId);
+    try {
+      const isEdit = !!editingSector;
+      const url = '/api/superadmin/sectors';
+      const method = isEdit ? 'PUT' : 'POST';
+      const body = {
+        id: sectorId,
+        name: sectorName,
+        lead_term: sectorLeadTerm,
+        product_term: sectorProductTerm,
+        deal_term: sectorDealTerm,
+        pipeline_stages: sectorStages
+      };
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(isEdit ? '🟢 Sector updated successfully!' : '🟢 Sector created successfully!');
+        setSectorsModalOpen(false);
+        fetchDashboardData();
+      } else {
+        alert(data.error || 'Failed to save sector.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saving sector.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteSector = async (id) => {
+    if (!confirm(`Are you sure you want to delete the sector "${id}"? This might affect organizations using this sector.`)) return;
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/superadmin/sectors?id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('🔴 Sector deleted successfully.');
+        fetchDashboardData();
+      } else {
+        alert(data.error || 'Failed to delete sector.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting sector.');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const fetchDashboardData = async () => {
@@ -316,29 +431,64 @@ export default function SuperAdminDashboard() {
           <nav className="space-y-1.5">
             {sidebarItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isSectorsActive = activeTab === 'sectors' || activeTab === 'sector-companies';
+              const isActive = item.id === 'sectors' ? isSectorsActive : activeTab === item.id;
+              
               return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                    isActive 
-                      ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/10'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`h-4.5 w-4.5 ${isActive ? 'text-slate-950' : 'text-slate-450'}`} />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.count > 0 && (
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
-                      isActive ? 'bg-slate-950 text-emerald-400' : 'bg-slate-800 text-slate-200 border border-slate-700'
-                    }`}>
-                      {item.count}
-                    </span>
+                <div key={item.id} className="space-y-1">
+                  <button
+                    onClick={() => {
+                      if (item.id === 'sectors') {
+                        setActiveTab('sectors');
+                        setSelectedSectorId(null);
+                      } else {
+                        setActiveTab(item.id);
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                      isActive 
+                        ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/10'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={`h-4.5 w-4.5 ${isActive ? 'text-slate-950' : 'text-slate-450'}`} />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.count > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                        isActive ? 'bg-slate-950 text-emerald-400' : 'bg-slate-800 text-slate-200 border border-slate-700'
+                      }`}>
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Submenu for CRM Sectors */}
+                  {item.id === 'sectors' && isSectorsActive && sectorsConfig.length > 0 && (
+                    <div className="pl-6 space-y-1.5 mt-1.5 border-l border-slate-800 ml-6">
+                      {sectorsConfig.map((sect) => {
+                        const isSectSelected = activeTab === 'sector-companies' && selectedSectorId === sect.id;
+                        return (
+                          <button
+                            key={sect.id}
+                            onClick={() => {
+                              setActiveTab('sector-companies');
+                              setSelectedSectorId(sect.id);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-extrabold transition-all duration-150 cursor-pointer block truncate ${
+                              isSectSelected
+                                ? 'text-emerald-400 bg-emerald-950/20 font-black'
+                                : 'text-slate-500 hover:text-slate-350 hover:bg-slate-900/40'
+                            }`}
+                          >
+                            • {sect.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </nav>
@@ -369,7 +519,7 @@ export default function SuperAdminDashboard() {
           2. MAIN CONTENT AREA (DYNAMIC TAB SWITCHING)
           ======================================================== */}
       <main className="flex-1 p-8 md:p-12 overflow-y-auto z-10 relative">
-        <div className="max-w-5xl mx-auto space-y-8">
+        <div className="max-w-7xl mx-auto space-y-8">
           
           {/* Header Row */}
           <div className="pb-6 border-b border-slate-800/80">
@@ -380,6 +530,7 @@ export default function SuperAdminDashboard() {
               {activeTab === 'billing' && 'SaaS Subscription Packages'}
               {activeTab === 'sectors' && 'CRM Terminology Adaptors'}
               {activeTab === 'tickets' && 'Customer Care Support Center'}
+              {activeTab === 'sector-companies' && 'Sector Companies Directory'}
             </h1>
             <p className="text-xs text-slate-450 mt-1.5 font-medium leading-relaxed">
               {activeTab === 'overview' && 'Real-time overview of monthly recurring revenue, platform metrics, and recent activities.'}
@@ -388,6 +539,7 @@ export default function SuperAdminDashboard() {
               {activeTab === 'billing' && 'Active price packages and platform quotas configured in the systems database.'}
               {activeTab === 'sectors' && 'Adaptive vertical layouts customized for different industrial sectors (e.g. Software, Real Estate).'}
               {activeTab === 'tickets' && 'Resolve platform difficulties and assist CRM administrators with their help desk tickets.'}
+              {activeTab === 'sector-companies' && 'Manage module licenses and access status for all companies in this CRM sector.'}
             </p>
           </div>
 
@@ -516,6 +668,9 @@ export default function SuperAdminDashboard() {
                             <span className="text-[10px] text-slate-400 font-mono truncate block mt-1 flex items-center gap-1">
                               <Mail className="h-3.5 w-3.5 text-slate-500" /> {org.ownerEmail}
                             </span>
+                            <span className="text-[10px] text-amber-400 font-mono truncate block mt-1 flex items-center gap-1 font-semibold">
+                              <Building2 className="h-3.5 w-3.5 text-amber-500" /> Sector: {org.sector || 'SOFTWARE_SERVICES'}
+                            </span>
                           </div>
                         </div>
 
@@ -586,7 +741,7 @@ export default function SuperAdminDashboard() {
                               </div>
                               <div className="min-w-0">
                                 <p className="font-extrabold text-slate-200 truncate leading-none">{org.name}</p>
-                                <span className="text-[9px] text-slate-500 block mt-1.5 font-mono uppercase tracking-wider">Registered: {new Date(org.created_at || Date.now()).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
+                                <span className="text-[9px] text-slate-500 block mt-1.5 font-mono uppercase tracking-wider">Registered: {new Date(org.created_at || Date.now()).toLocaleDateString('en-IN', { dateStyle: 'medium' })} • Sector: {org.sector || 'SOFTWARE_SERVICES'}</span>
                               </div>
                             </td>
 
@@ -620,13 +775,6 @@ export default function SuperAdminDashboard() {
                             {/* Actions */}
                             <td className="px-6 py-4.5 text-center">
                               <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  onClick={() => handleOpenModulesModal(org)}
-                                  className="p-1 px-2.5 rounded bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/30 text-indigo-400 hover:text-white font-extrabold text-[10px] cursor-pointer flex items-center gap-1 transition"
-                                >
-                                  <Boxes className="h-3 w-3" />
-                                  Modules
-                                </button>
                                 {org.approval_status !== 'Approved' && (
                                   <button
                                     disabled={actionLoading !== null}
@@ -710,7 +858,6 @@ export default function SuperAdminDashboard() {
                               case 'users': return 'Users & Employee Directory';
                               case 'roles': return 'Roles & Permission Gates';
                               case 'teams': return 'Teams & Department Manager';
-                              case 'healthcare': return 'Healthcare Suite';
                               default: return slug.charAt(0).toUpperCase() + slug.slice(1);
                             }
                           };
@@ -828,14 +975,43 @@ export default function SuperAdminDashboard() {
               ======================================================= */}
           {activeTab === 'sectors' && (
             <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">Available Sectors: {sectorsConfig.length}</span>
+                <button
+                  onClick={openAddSectorModal}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl shadow-lg transition duration-200 cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add New Sector
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
                 {sectorsConfig.map((sector) => (
-                  <div key={sector.id} className="p-6 bg-slate-900/30 border border-slate-800 rounded-2xl flex flex-col justify-between hover:border-slate-700/60 transition duration-300">
+                  <div key={sector.id} className="p-6 bg-slate-900/30 border border-slate-800 rounded-2xl flex flex-col justify-between hover:border-slate-700/60 transition duration-300 relative group">
                     <div className="space-y-4">
-                      {/* Name & ID */}
-                      <div>
-                        <h4 className="font-extrabold text-sm text-slate-200">{sector.name}</h4>
-                        <span className="text-[9px] font-mono text-slate-500 font-bold block mt-1 tracking-wider uppercase">SECTOR_KEY: {sector.id}</span>
+                      {/* Name & ID & Actions */}
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <h4 className="font-extrabold text-sm text-slate-200">{sector.name}</h4>
+                          <span className="text-[9px] font-mono text-slate-500 font-bold block mt-1 tracking-wider uppercase">SECTOR_KEY: {sector.id}</span>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={() => openEditSectorModal(sector)}
+                            className="p-1.5 rounded bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white transition cursor-pointer"
+                            title="Edit Sector"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSector(sector.id)}
+                            className="p-1.5 rounded bg-slate-800 hover:bg-rose-950 text-slate-450 hover:text-rose-450 transition cursor-pointer"
+                            title="Delete Sector"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Config Parameters Table */}
@@ -868,12 +1044,241 @@ export default function SuperAdminDashboard() {
                           ))}
                         </div>
                       </div>
+
+                      {/* Assigned Companies Collapsible Section */}
+                      <div className="space-y-2 pt-4 border-t border-slate-800/80">
+                        {(() => {
+                          const sectorOrgs = organizations.filter(org => org.sector === sector.id || (sector.id === 'SOFTWARE_SERVICES' && !org.sector));
+                          const isExpanded = expandedSectorId === sector.id;
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedSectorId(isExpanded ? null : sector.id)}
+                                className="w-full flex items-center justify-between py-1 px-2.5 rounded-lg bg-slate-950 border border-slate-850 hover:bg-slate-900 text-[10px] font-black text-slate-400 cursor-pointer transition uppercase font-mono tracking-wider"
+                              >
+                                <span>Assigned Companies ({sectorOrgs.length})</span>
+                                <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-indigo-450' : 'text-slate-500'}`} />
+                              </button>
+
+                              {isExpanded && (
+                                <div className="space-y-2 mt-2 max-h-72 overflow-y-auto pr-1 animate-in fade-in duration-200">
+                                  {sectorOrgs.length === 0 ? (
+                                    <p className="text-[10px] text-slate-500 italic pl-1 font-medium">No companies registered in this sector.</p>
+                                  ) : (
+                                    sectorOrgs.map((org) => (
+                                      <div key={org.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-850/60 text-xs gap-3">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                          <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                                            org.approval_status === 'Approved' ? 'bg-emerald-500' :
+                                            org.approval_status === 'Pending' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
+                                          }`} />
+                                          <div className="min-w-0">
+                                            <span className="font-extrabold text-slate-200 block truncate leading-none">{org.name}</span>
+                                            <span className="text-[9px] font-mono text-slate-500 font-bold block mt-1">{org.ownerEmail}</span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleOpenModulesModal(org)}
+                                            className="py-1 px-3 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/30 text-indigo-400 hover:text-white font-extrabold text-[9px] cursor-pointer flex items-center gap-1.5 transition"
+                                          >
+                                            <Boxes className="h-3.5 w-3.5" />
+                                            Configure Modules
+                                          </button>
+                                          
+                                          <button
+                                            disabled={actionLoading !== null}
+                                            onClick={() => handleStatusUpdate(org.id, org.approval_status === 'Approved' ? 'Suspended' : 'Approved')}
+                                            className={`py-1 px-3 rounded-lg text-[9px] font-black cursor-pointer transition flex items-center gap-1.5 ${
+                                              org.approval_status === 'Approved' 
+                                                ? 'bg-rose-950/50 hover:bg-rose-900 border border-rose-900/30 text-rose-450 hover:text-white' 
+                                                : 'bg-emerald-950/50 hover:bg-emerald-900 border border-emerald-900/30 text-emerald-400 hover:text-white'
+                                            }`}
+                                          >
+                                            {actionLoading === org.id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : org.approval_status === 'Approved' ? (
+                                              'Deny Access'
+                                            ) : (
+                                              'Allow Access'
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
+
+          {/* ========================================================
+              TAB G: SECTOR SPECIFIC COMPANIES LIST
+              ======================================================= */}
+          {activeTab === 'sector-companies' && selectedSectorId && (() => {
+            const currentSector = sectorsConfig.find(s => s.id === selectedSectorId);
+            const sectorOrgs = organizations.filter(org => org.sector === selectedSectorId || (selectedSectorId === 'SOFTWARE_SERVICES' && !org.sector));
+            const approvedCount = sectorOrgs.filter(o => o.approval_status === 'Approved').length;
+            const pendingCount = sectorOrgs.filter(o => o.approval_status === 'Pending').length;
+            const suspendedCount = sectorOrgs.filter(o => o.approval_status === 'Suspended').length;
+
+            return (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                {/* Sector Header */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xl font-black text-white flex items-center gap-2">
+                      <Building2 className="h-6 w-6 text-emerald-400" />
+                      {currentSector ? currentSector.name : 'Sector'} Companies
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1 font-semibold leading-relaxed">
+                      Manage module licenses and access status for all companies in the <span className="text-emerald-400 font-bold">{currentSector ? currentSector.name : ''}</span> sector.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('sectors')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-black rounded-xl transition duration-200 cursor-pointer"
+                  >
+                    Manage Sector Configuration
+                  </button>
+                </div>
+
+                {/* Sector Stats Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-500 font-mono font-black uppercase tracking-wider">Total Companies</span>
+                    <h3 className="text-xl font-black text-slate-100 mt-2">{sectorOrgs.length}</h3>
+                  </div>
+                  <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[10px] text-emerald-500 font-mono font-black uppercase tracking-wider">Active Access</span>
+                    <h3 className="text-xl font-black text-emerald-400 mt-2">{approvedCount}</h3>
+                  </div>
+                  <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[10px] text-amber-500 font-mono font-black uppercase tracking-wider">Pending Review</span>
+                    <h3 className="text-xl font-black text-amber-400 mt-2">{pendingCount}</h3>
+                  </div>
+                  <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[10px] text-rose-500 font-mono font-black uppercase tracking-wider">Denied Access</span>
+                    <h3 className="text-xl font-black text-rose-400 mt-2">{suspendedCount}</h3>
+                  </div>
+                </div>
+
+                {/* Companies Directory list */}
+                <div className="bg-slate-900/20 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl">
+                  {sectorOrgs.length === 0 ? (
+                    <div className="py-20 text-center text-slate-500 font-bold text-sm italic">
+                      No companies are registered in this sector.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-850">
+                      <table className="min-w-full divide-y divide-slate-850 bg-slate-950/40">
+                        <thead className="bg-slate-900/60 font-mono text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                          <tr>
+                            <th scope="col" className="px-6 py-4 text-left">Company details</th>
+                            <th scope="col" className="px-6 py-4 text-left">Primary Owner</th>
+                            <th scope="col" className="px-6 py-4 text-left">Email Address</th>
+                            <th scope="col" className="px-6 py-4 text-center">Status</th>
+                            <th scope="col" className="px-6 py-4 text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-850 text-xs font-semibold text-slate-350">
+                          {sectorOrgs.map((org) => (
+                            <tr key={org.id} className="hover:bg-slate-900/10 transition-colors duration-150">
+                              {/* Name */}
+                              <td className="px-6 py-4.5 flex items-center gap-3">
+                                <div className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs uppercase font-mono border ${
+                                  org.approval_status === 'Approved' ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/30' :
+                                  org.approval_status === 'Pending' ? 'bg-amber-950/40 text-amber-400 border-amber-900/30' :
+                                  'bg-rose-950/40 text-rose-400 border-rose-900/30'
+                                }`}>
+                                  {org.name.slice(0, 2)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-slate-200 truncate leading-none">{org.name}</p>
+                                  <span className="text-[9px] text-slate-500 block mt-1.5 font-mono uppercase tracking-wider">Registered: {new Date(org.created_at || Date.now()).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
+                                </div>
+                              </td>
+
+                              {/* Owner */}
+                              <td className="px-6 py-4.5 text-slate-200">
+                                <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-slate-450" /> {org.ownerName}</span>
+                              </td>
+
+                              {/* Email */}
+                              <td className="px-6 py-4.5 font-mono text-[11px] text-slate-400">
+                                <a href={`mailto:${org.ownerEmail}`} className="hover:underline flex items-center gap-1">
+                                  <Mail className="h-3 w-3 shrink-0" />
+                                  {org.ownerEmail}
+                                </a>
+                              </td>
+
+                              {/* Status */}
+                              <td className="px-6 py-4.5 text-center">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                                  org.approval_status === 'Approved' ? 'bg-emerald-950 text-emerald-400 border-emerald-900/40' :
+                                  org.approval_status === 'Pending' ? 'bg-amber-950 text-amber-400 border-amber-900/40' :
+                                  'bg-rose-950 text-rose-400 border-rose-900/40'
+                                }`}>
+                                  {org.approval_status === 'Approved' && <ShieldCheck className="h-3 w-3" />}
+                                  {org.approval_status === 'Pending' && <Clock className="h-3 w-3 animate-pulse" />}
+                                  {org.approval_status === 'Suspended' && <Ban className="h-3 w-3" />}
+                                  {org.approval_status}
+                                </span>
+                              </td>
+
+                              {/* Actions */}
+                              <td className="px-6 py-4.5 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => handleOpenModulesModal(org)}
+                                    className="p-1 px-2.5 rounded bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/30 text-indigo-400 hover:text-white font-extrabold text-[10px] cursor-pointer flex items-center gap-1 transition"
+                                  >
+                                    <Boxes className="h-3 w-3" />
+                                    Modules
+                                  </button>
+                                  {org.approval_status !== 'Approved' && (
+                                    <button
+                                      disabled={actionLoading !== null}
+                                      onClick={() => handleStatusUpdate(org.id, 'Approved')}
+                                      className="p-1 px-2.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] cursor-pointer flex items-center gap-1 transition disabled:opacity-50"
+                                    >
+                                      <Check className="h-3 w-3" />
+                                      Approve
+                                    </button>
+                                  )}
+                                  {org.approval_status === 'Approved' && (
+                                    <button
+                                      disabled={actionLoading !== null}
+                                      onClick={() => handleStatusUpdate(org.id, 'Suspended')}
+                                      className="p-1 px-2.5 rounded bg-slate-900 hover:bg-rose-950 border border-slate-800 hover:border-rose-900 text-slate-400 hover:text-rose-400 font-bold text-[10px] cursor-pointer flex items-center gap-1 transition disabled:opacity-50"
+                                    >
+                                      <Ban className="h-3 w-3" />
+                                      Suspend
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ========================================================
               TAB E: TICKETS
@@ -1015,6 +1420,172 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          4. SECTOR CREATE/EDIT MODAL
+          ======================================================== */}
+      {sectorsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <form 
+            onSubmit={handleSaveSector}
+            className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 relative overflow-hidden animate-in zoom-in-95 duration-200"
+          >
+            <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-emerald-500/5 blur-[60px] pointer-events-none"></div>
+
+            <div className="flex justify-between items-start pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <Boxes className="h-4.5 w-4.5 text-emerald-400" />
+                  {editingSector ? 'Edit Sector Configuration' : 'Add New CRM Sector'}
+                </h3>
+                <p className="text-[10px] text-slate-500 font-bold block mt-1">
+                  Define dynamic terminology labels and pipeline stages for this sector.
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSectorsModalOpen(false)}
+                className="text-slate-500 hover:text-white p-1 hover:bg-slate-800 rounded-lg cursor-pointer transition border-0 bg-transparent"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div className="max-h-[400px] overflow-y-auto space-y-4 pr-1 scrollbar-thin scrollbar-thumb-slate-800">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Sector ID (Unique Key) *</label>
+                  <input
+                    type="text"
+                    required
+                    disabled={!!editingSector}
+                    placeholder="e.g. REAL_ESTATE"
+                    value={sectorId}
+                    onChange={(e) => setSectorId(e.target.value.toUpperCase().replace(/\s+/g, '_'))}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Sector Display Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Real Estate"
+                    value={sectorName}
+                    onChange={(e) => setSectorName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Lead Term *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Property Lead"
+                    value={sectorLeadTerm}
+                    onChange={(e) => setSectorLeadTerm(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Product Term *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Property"
+                    value={sectorProductTerm}
+                    onChange={(e) => setSectorProductTerm(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Deal Term *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Booking / Offer"
+                    value={sectorDealTerm}
+                    onChange={(e) => setSectorDealTerm(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Pipeline Stages Builder */}
+              <div className="space-y-2 border-t border-slate-800/80 pt-3">
+                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider">Pipeline Stages Builder</label>
+                
+                {/* Stage Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter stage name..."
+                    value={newStageInput}
+                    onChange={(e) => setNewStageInput(e.target.value)}
+                    className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-850 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddStage(); } }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddStage}
+                    className="px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {/* Display Current Stages */}
+                <div className="flex flex-wrap gap-1.5 mt-2 bg-slate-950/40 p-3 rounded-2xl border border-slate-850">
+                  {sectorStages.length === 0 ? (
+                    <span className="text-[10px] text-slate-650 italic">No stages added. Every pipeline requires at least one stage.</span>
+                  ) : (
+                    sectorStages.map((stage, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-semibold text-slate-350">
+                        <span>{stage}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStage(stage)}
+                          className="p-0.5 rounded hover:bg-slate-800 text-slate-500 hover:text-white transition cursor-pointer"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-3 border-t border-slate-850">
+              <button
+                type="button"
+                onClick={() => setSectorsModalOpen(false)}
+                className="flex-1 py-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-800 text-slate-400 hover:text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={actionLoading !== null}
+                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {actionLoading === sectorId ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Save Sector
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

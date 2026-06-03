@@ -41,7 +41,7 @@ function getTransporter() {
  * @param {string} [params.proposalFile] - Attached proposal filename (e.g., Proposal.pdf)
  * @returns {Promise<Object>} - Delivery status and metadata
  */
-export async function sendTrackedEmail({ emailId, toEmail, toName, subject, body, proposalFile }) {
+export async function sendTrackedEmail({ emailId, toEmail, toName, subject, body, proposalFile, cc }) {
   const transporter = getTransporter();
   const appUrl = process.env.APP_URL || 'http://localhost:5000';
 
@@ -153,6 +153,7 @@ export async function sendTrackedEmail({ emailId, toEmail, toName, subject, body
     const mailOptions = {
       from: fromEmail,
       to: `"${toName}" <${toEmail}>`,
+      cc: cc || undefined,
       subject: subject,
       html: htmlContent,
       // Provide a clean plaintext fallback for older readers

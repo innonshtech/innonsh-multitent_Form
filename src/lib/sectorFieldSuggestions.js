@@ -18,16 +18,7 @@ export const SECTOR_FIELD_SUGGESTIONS = {
     { field_key: 'dealer_location', field_label: 'Preferred Dealer Location', field_type: 'text', options: [], is_required: false },
   ],
 
-  'Healthcare': [
-    { field_key: 'specialization', field_label: 'Specialization', field_type: 'dropdown', options: ['Cardiology', 'Orthopedics', 'Neurology', 'Oncology', 'General Surgery', 'Pediatrics', 'Gynecology', 'Dermatology'], is_required: false },
-    { field_key: 'hospital_type', field_label: 'Hospital Type', field_type: 'dropdown', options: ['Private Hospital', 'Government Hospital', 'Clinic', 'Diagnostic Center', 'Nursing Home'], is_required: false },
-    { field_key: 'bed_capacity', field_label: 'Bed Capacity', field_type: 'number', options: [], is_required: false },
-    { field_key: 'insurance_provider', field_label: 'Insurance Provider', field_type: 'text', options: [], is_required: false },
-    { field_key: 'equipment_interest', field_label: 'Equipment Interest', field_type: 'text', options: [], is_required: false },
-    { field_key: 'referring_doctor', field_label: 'Referring Doctor', field_type: 'text', options: [], is_required: false },
-    { field_key: 'patient_type', field_label: 'Patient Type', field_type: 'dropdown', options: ['OPD', 'IPD', 'Emergency', 'Day Care'], is_required: false },
-    { field_key: 'accreditation', field_label: 'Accreditation (NABH/JCI)', field_type: 'text', options: [], is_required: false },
-  ],
+
 
   'Real Estate': [
     { field_key: 'property_type', field_label: 'Property Type', field_type: 'dropdown', options: ['Flat / Apartment', 'Independent Villa', 'Plot / Land', 'Commercial Office', 'Retail Shop', 'Warehouse'], is_required: false },

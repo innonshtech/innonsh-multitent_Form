@@ -25,13 +25,13 @@ export default function DealsPage() {
   const [sector, setSector] = useState('');
 
   // Kanban pipeline columns/stages with premium high-contrast colors
-  const stages = [
+  const [stages, setStages] = useState([
     { key: 'Prospecting', label: 'Prospecting', color: 'border-t-blue-500', text: 'text-blue-600', bg: 'bg-slate-100/50' },
     { key: 'Proposal', label: 'Proposal Sent', color: 'border-t-violet-500', text: 'text-violet-600', bg: 'bg-slate-100/50' },
     { key: 'Negotiation', label: 'Negotiation', color: 'border-t-amber-500', text: 'text-amber-600', bg: 'bg-slate-100/50' },
     { key: 'Won', label: 'Closed Won', color: 'border-t-emerald-500', text: 'text-emerald-600', bg: 'bg-slate-100/50' },
     { key: 'Lost', label: 'Closed Lost', color: 'border-t-rose-500', text: 'text-rose-600', bg: 'bg-slate-100/50' },
-  ];
+  ]);
 
   useEffect(() => {
     async function initDealsPage() {
@@ -40,6 +40,29 @@ export default function DealsPage() {
         if (userRes.ok) {
           const data = await userRes.json();
           setCurrentUser(data.user);
+
+          // Load dynamic pipeline stages based on active sector
+          if (data.user?.sectorConfig?.pipelineStages && data.user.sectorConfig.pipelineStages.length > 0) {
+            const colors = [
+              { border: 'border-t-blue-500', text: 'text-blue-600' },
+              { border: 'border-t-violet-500', text: 'text-violet-600' },
+              { border: 'border-t-amber-500', text: 'text-amber-600' },
+              { border: 'border-t-emerald-500', text: 'text-emerald-600' },
+              { border: 'border-t-rose-500', text: 'text-rose-600' },
+              { border: 'border-t-indigo-500', text: 'text-indigo-600' }
+            ];
+            const dynamicStages = data.user.sectorConfig.pipelineStages.map((stageName, index) => {
+              const colorSet = colors[index % colors.length];
+              return {
+                key: stageName,
+                label: stageName,
+                color: colorSet.border,
+                text: colorSet.text,
+                bg: 'bg-slate-100/50'
+              };
+            });
+            setStages(dynamicStages);
+          }
 
           // Fetch custom fields schema + standard visibility
           const [cfRes, sfRes, suggRes] = await Promise.all([
@@ -176,10 +199,10 @@ export default function DealsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Briefcase className="h-7 w-7 text-emerald-500" />
-            Deals Pipeline
+            {currentUser?.sectorConfig?.dealTerm || 'Deal'}s Pipeline
           </h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">
-            Drag and drop deals between sales stages to update pipeline metrics in real-time.
+            Drag and drop {currentUser?.sectorConfig?.dealTerm || 'deal'}s between sales stages to update pipeline metrics in real-time.
           </p>
         </div>
 

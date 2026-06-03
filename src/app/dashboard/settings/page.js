@@ -67,7 +67,7 @@ export default function SettingsDashboardPage() {
     },
     {
       title: 'CRM Add-on Modules',
-      description: 'Activate, lock, or request advanced CRM features and vertical modules like Real Estate, Healthcare, or Tickets.',
+      description: 'Activate, lock, or request advanced CRM features and vertical modules like Real Estate or Tickets.',
       href: '/dashboard/settings/modules',
       icon: Sparkles,
       iconColor: isOwner ? 'text-amber-500 bg-amber-50 border-amber-100' : 'text-slate-400 bg-slate-50 border-slate-200',

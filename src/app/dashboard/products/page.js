@@ -182,7 +182,7 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Package className="h-7 w-7 text-emerald-500" />
-            Pricing Inventory & Catalogue
+            Pricing {currentUser?.sectorConfig?.productTerm || 'Product'}s Catalogue
           </h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">
             Manage company pricing models, active license SKUs, consulting services, and base costs.
@@ -195,7 +195,7 @@ export default function ProductsPage() {
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-450 text-white text-xs font-bold shadow-md shadow-emerald-500/10 active:scale-[0.98] transition cursor-pointer"
             >
               <Plus className="h-4.5 w-4.5 stroke-[3]" />
-              Add Catalog Product
+              Add Catalog {currentUser?.sectorConfig?.productTerm || 'Product'}
             </button>
           </div>
         )}
@@ -206,7 +206,7 @@ export default function ProductsPage() {
         {/* Total catalog items */}
         <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Total Products SKU</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Total {currentUser?.sectorConfig?.productTerm || 'Product'}s SKU</span>
             <span className="text-2xl font-black text-slate-800 block mt-1">{totalProducts}</span>
           </div>
           <div className="h-10 w-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
@@ -314,7 +314,7 @@ export default function ProductsPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="px-6 py-4">Product details</th>
+                  <th className="px-6 py-4">{currentUser?.sectorConfig?.productTerm || 'Product'} details</th>
                   <th className="px-6 py-4">SKU Code</th>
                   <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4">Base price (INR)</th>
@@ -382,7 +382,7 @@ export default function ProductsPage() {
             <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
               <h2 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
                 <Package className="h-5 w-5 text-emerald-500" />
-                Register New Inventory Product
+                Register New Inventory {currentUser?.sectorConfig?.productTerm || 'Product'}
               </h2>
               <button onClick={() => setAddModalOpen(false)} className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-850">
                 <X className="h-5 w-5" />
@@ -399,7 +399,7 @@ export default function ProductsPage() {
 
               {/* Name */}
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Product Name *</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{currentUser?.sectorConfig?.productTerm || 'Product'} Name *</label>
                 <input
                   type="text"
                   required
@@ -439,7 +439,7 @@ export default function ProductsPage() {
               {/* Category & Status */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Product Category</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{currentUser?.sectorConfig?.productTerm || 'Product'} Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}

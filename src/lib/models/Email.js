@@ -74,6 +74,10 @@ const EmailSchema = new mongoose.Schema(
       enum: ['email', 'whatsapp', 'both'],
       default: 'email',
     },
+    cc: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,

@@ -151,22 +151,6 @@ const ALL_MODULES = [
     category: 'Administration',
     color: 'rose',
   },
-  {
-    key: 'real-estate',
-    name: 'Real Estate Suite',
-    desc: 'Properties inventory, weighted matching recommendations, site visits scheduler, holds and milestones builder',
-    icon: Briefcase,
-    category: 'Core Sales',
-    color: 'emerald',
-  },
-  {
-    key: 'healthcare',
-    name: 'Healthcare Suite',
-    desc: 'Comprehensive patient directory, doctors scheduler, medical records, billing, pharmacy and claims tracker',
-    icon: Heart,
-    category: 'Core Sales',
-    color: 'rose',
-  },
 ];
 
 // ─── Color maps per category color token ─────────────────────────────────────

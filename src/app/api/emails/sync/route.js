@@ -195,7 +195,8 @@ export async function GET(req) {
                     status: 'Pending',
                     notes: `Automated Sync Task: Client responded to proposal: "${dbEmail.subject}".\n\nReply:\n"${incomingEmailBody}"\n\nReview this in Email Hub and complete requirements.`,
                     assigned_to: assignedRep,
-                    lead_id: lead.id
+                    lead_id: lead.id,
+                    org_id: dbEmail.org_id
                   }]);
 
                   // Generate system notification banner for Assigned Rep
@@ -227,7 +228,8 @@ export async function GET(req) {
                     status: 'Pending',
                     notes: `Automated Sync Task: Contact responded to proposal: "${dbEmail.subject}".\n\nReply:\n"${incomingEmailBody}"\n\nReview this and contact client.`,
                     assigned_to: assignedRep,
-                    contact_id: contact.id
+                    contact_id: contact.id,
+                    org_id: dbEmail.org_id
                   }]);
 
                   // Create Notification

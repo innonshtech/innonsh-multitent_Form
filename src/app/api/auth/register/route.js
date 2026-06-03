@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 // POST /api/auth/register - Self-signup endpoint for Sales Executives (requires Manager approval)
 export async function POST(req) {
   try {
-    const { companyName, name, email, password } = await req.json();
+    const { companyName, name, email, password, sector } = await req.json();
 
     if (!companyName || !name || !email || !password) {
       return NextResponse.json({ error: 'Company name, name, email, and password are required fields.' }, { status: 400 });
@@ -75,7 +75,8 @@ export async function POST(req) {
           {
             name: cleanCompanyName,
             approval_status: 'Pending',
-            is_active: false
+            is_active: false,
+            sector: sector || 'SOFTWARE_SERVICES'
           }
         ])
         .select('*')
@@ -242,6 +243,10 @@ export async function POST(req) {
                               <td style="color: #1e293b; font-weight: bold;">${cleanCompanyName}</td>
                             </tr>
                             <tr>
+                              <td style="font-weight: bold; color: #475569;">Requested CRM Sector:</td>
+                              <td style="color: #1e293b; font-weight: bold;">${sector || 'SOFTWARE_SERVICES'}</td>
+                            </tr>
+                            <tr>
                               <td style="font-weight: bold; color: #475569;">Owner Name:</td>
                               <td style="color: #1e293b;">${userName}</td>
                             </tr>
@@ -276,7 +281,7 @@ export async function POST(req) {
             toName: admin.name,
             subject: approvalSubject,
             html: approvalHtml,
-            text: `New company registration request from ${cleanCompanyName} (Owner: ${userName}, ${userEmail}). Approve at ${appUrl}/super-admin`
+            text: `New company registration request from ${cleanCompanyName} (Owner: ${userName}, ${userEmail}, Requested CRM Sector: ${sector || 'SOFTWARE_SERVICES'}). Approve at ${appUrl}/super-admin`
           });
 
           // Log admin approval notification in database outbox
