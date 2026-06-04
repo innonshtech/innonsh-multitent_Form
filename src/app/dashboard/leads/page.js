@@ -34,7 +34,9 @@ import {
   Info,
   Paperclip,
   File,
-  Edit
+  Edit,
+  Tag,
+  Hash
 } from 'lucide-react';
 
 // Helper to safely parse Postgres date strings in strict browsers (like Safari)
@@ -52,6 +54,24 @@ const localToUTCISO = (localTimeStr) => {
   if (!localTimeStr) return null;
   const date = new Date(localTimeStr);
   return isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const getCustomFieldIcon = (iconName) => {
+  switch (iconName) {
+    case 'user': return User;
+    case 'building': return Building;
+    case 'phone': return Phone;
+    case 'mail': return Mail;
+    case 'globe': return Globe;
+    case 'calendar': return Calendar;
+    case 'dollarsign': return DollarSign;
+    case 'briefcase': return Briefcase;
+    case 'info': return Info;
+    case 'tag': return Tag;
+    case 'hash': return Hash;
+    case 'messagecircle': return MessageCircle;
+    default: return null;
+  }
 };
 
 export default function LeadsPage() {
@@ -241,6 +261,7 @@ export default function LeadsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLeads();
   }, [search, statusFilter, sourceFilter, priorityFilter, repFilter, sortBy]);
 
@@ -743,6 +764,7 @@ export default function LeadsPage() {
     if (lead.status === 'Qualified' || lead.status === 'Lost') return false;
     const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
     const lastUpdate = safeNewDate(lead.updatedAt).getTime();
+    // eslint-disable-next-line react-hooks/purity
     return (Date.now() - lastUpdate) > sevenDaysInMs;
   };
 
@@ -927,7 +949,7 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Users className="h-7 w-7 text-emerald-500" />
-            {currentUser?.role === 'sales_rep' ? `My ${currentUser?.sectorConfig?.leadTerm || 'Lead'}s Directory` : `Corporate ${currentUser?.sectorConfig?.leadTerm || 'Lead'}s Directory`}
+            {currentUser?.role === 'sales_rep' ? `My ${currentUser?.sectorConfig?.leadTerm || 'Lead'}s` : `Corporate ${currentUser?.sectorConfig?.leadTerm || 'Lead'}s`}
           </h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">
             Standard enterprise rules: strict duplicate filters, follow-up calendar alerts, and automated audit tracking.
@@ -968,7 +990,7 @@ export default function LeadsPage() {
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold shadow-md shadow-emerald-500/10 active:scale-[0.98] transition cursor-pointer"
           >
             <Plus className="h-4.5 w-4.5 stroke-[3]" />
-            Create {currentUser?.sectorConfig?.leadTerm || 'Lead'}
+            Create Leads
           </button>
         </div>
       </div>
@@ -1029,7 +1051,7 @@ export default function LeadsPage() {
           </span>
           <input
             type="text"
-            placeholder="Name, Company, Phone, City..."
+            placeholder="Name, Organization, Phone, City..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 placeholder-slate-400 transition"
@@ -1147,7 +1169,7 @@ export default function LeadsPage() {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                   <th className="px-6 py-4">{currentUser?.sectorConfig?.leadTerm || 'Lead'} Name</th>
-                  <th className="px-6 py-4">Company & Designation</th>
+                  <th className="px-6 py-4">Organization & Designation</th>
                   <th className="px-6 py-4">Priority & Warning</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">WhatsApp Log</th>
@@ -1870,7 +1892,7 @@ export default function LeadsPage() {
 
                 <div className={`grid grid-cols-1 md:grid-cols-${hiddenStandardFields.includes('website') ? '1' : '2'} gap-4`}>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Company Name *</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Organization Name *</label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 pointer-events-none">
                         <Building className="h-4 w-4" />
@@ -1904,6 +1926,103 @@ export default function LeadsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Org-Defined Custom Fields (Create Modal) */}
+              {orgCustomFieldDefs.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-1">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest block font-mono">Custom details</span>
+                    {currentUser?.role === 'owner' && (
+                      <a href="/dashboard/settings/custom-fields" target="_blank" className="text-[9px] text-emerald-600 hover:underline font-bold">⚙️ Manage Fields →</a>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {orgCustomFieldDefs.map((fieldDef) => {
+                      const IconComponent = fieldDef.icon_name ? getCustomFieldIcon(fieldDef.icon_name) : null;
+                      return (
+                        <div key={fieldDef.id}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                            {fieldDef.field_label}
+                            {fieldDef.is_required && <span className="text-rose-500 ml-1">*</span>}
+                          </label>
+                          <div className={IconComponent ? "relative" : ""}>
+                            {IconComponent && (
+                              <span className={`absolute inset-y-0 left-0 flex pl-3 text-slate-400 pointer-events-none ${fieldDef.field_type === 'textarea' ? 'items-start pt-3' : 'items-center'}`}>
+                                <IconComponent className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                            {fieldDef.field_type === 'text' && (
+                              <input
+                                type="text"
+                                placeholder={fieldDef.placeholder || ''}
+                                value={orgCustomFieldValues[fieldDef.field_key] || ''}
+                                onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'number' && (
+                              <input
+                                type="number"
+                                placeholder={fieldDef.placeholder || ''}
+                                value={orgCustomFieldValues[fieldDef.field_key] || ''}
+                                onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'date' && (
+                              <input
+                                type="date"
+                                placeholder={fieldDef.placeholder || ''}
+                                value={orgCustomFieldValues[fieldDef.field_key] || ''}
+                                onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'textarea' && (
+                              <textarea
+                                rows={2}
+                                placeholder={fieldDef.placeholder || ''}
+                                value={orgCustomFieldValues[fieldDef.field_key] || ''}
+                                onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3 pt-2' : 'px-3 py-2'} rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition resize-none`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'dropdown' && (
+                              <select
+                                value={orgCustomFieldValues[fieldDef.field_key] || ''}
+                                onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition cursor-pointer`}
+                              >
+                                <option value="">{fieldDef.placeholder || '-- Select --'}</option>
+                                {(fieldDef.options || []).map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            )}
+                            {fieldDef.field_type === 'boolean' && (
+                              <div className="flex gap-4 pt-2.5">
+                                {['Yes', 'No'].map((opt) => (
+                                  <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`cf_${fieldDef.field_key}`}
+                                      value={opt}
+                                      checked={orgCustomFieldValues[fieldDef.field_key] === opt}
+                                      onChange={() => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: opt }))}
+                                      className="accent-emerald-500 cursor-pointer"
+                                    />
+                                    <span className="text-xs font-bold text-slate-655">{opt}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Section 2: Contact Details */}
               <div className="space-y-4">
@@ -2204,96 +2323,7 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              {/* Section 6: Org-Defined Custom Fields */}
-              <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/40 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider font-mono">Custom Fields ({orgCustomFieldDefs.length} defined)</span>
-                  {currentUser?.role === 'owner' && (
-                    <a href="/dashboard/settings/custom-fields" target="_blank" className="text-[9px] text-indigo-500 hover:underline font-bold">⚙️ Manage Fields →</a>
-                  )}
-                </div>
 
-                {orgCustomFieldDefs.length === 0 ? (
-                  <div className="text-[11px] text-slate-400 font-medium italic py-2">
-                    No custom fields defined yet.
-                    {currentUser?.role === 'owner' && (
-                      <a href="/dashboard/settings/custom-fields" target="_blank" className="text-indigo-500 hover:underline ml-1 font-bold">Set up Custom Fields →</a>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {orgCustomFieldDefs.map((fieldDef) => (
-                      <div key={fieldDef.id}>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                          {fieldDef.field_label}
-                          {fieldDef.is_required && <span className="text-rose-500 ml-1">*</span>}
-                        </label>
-                        {fieldDef.field_type === 'text' && (
-                          <input
-                            type="text"
-                            value={orgCustomFieldValues[fieldDef.field_key] || ''}
-                            onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                        {fieldDef.field_type === 'number' && (
-                          <input
-                            type="number"
-                            value={orgCustomFieldValues[fieldDef.field_key] || ''}
-                            onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                        {fieldDef.field_type === 'date' && (
-                          <input
-                            type="date"
-                            value={orgCustomFieldValues[fieldDef.field_key] || ''}
-                            onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                        {fieldDef.field_type === 'textarea' && (
-                          <textarea
-                            rows={2}
-                            value={orgCustomFieldValues[fieldDef.field_key] || ''}
-                            onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition resize-none"
-                          />
-                        )}
-                        {fieldDef.field_type === 'dropdown' && (
-                          <select
-                            value={orgCustomFieldValues[fieldDef.field_key] || ''}
-                            onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition cursor-pointer"
-                          >
-                            <option value="">-- Select --</option>
-                            {(fieldDef.options || []).map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        )}
-                        {fieldDef.field_type === 'boolean' && (
-                          <div className="flex gap-3">
-                            {['Yes', 'No'].map((opt) => (
-                              <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={`cf_${fieldDef.field_key}`}
-                                  value={opt}
-                                  checked={orgCustomFieldValues[fieldDef.field_key] === opt}
-                                  onChange={() => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: opt }))}
-                                  className="accent-indigo-500"
-                                />
-                                <span className="text-xs font-bold text-slate-600">{opt}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
               {/* Submit Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
@@ -2370,7 +2400,7 @@ export default function LeadsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Company Name *</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Organization Name *</label>
                     <input
                       type="text"
                       required
@@ -2411,6 +2441,100 @@ export default function LeadsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Org-Defined Custom Fields (Edit Mode) */}
+              {orgCustomFieldDefs.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-1">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest block font-mono">Custom details</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {orgCustomFieldDefs.map((fieldDef) => {
+                      const IconComponent = fieldDef.icon_name ? getCustomFieldIcon(fieldDef.icon_name) : null;
+                      return (
+                        <div key={fieldDef.id}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                            {fieldDef.field_label}
+                            {fieldDef.is_required && <span className="text-rose-500 ml-1">*</span>}
+                          </label>
+                          <div className={IconComponent ? "relative" : ""}>
+                            {IconComponent && (
+                              <span className={`absolute inset-y-0 left-0 flex pl-3 text-slate-400 pointer-events-none ${fieldDef.field_type === 'textarea' ? 'items-start pt-3' : 'items-center'}`}>
+                                <IconComponent className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                            {fieldDef.field_type === 'text' && (
+                              <input
+                                type="text"
+                                placeholder={fieldDef.placeholder || ''}
+                                value={editLeadCustomData[fieldDef.field_key] || ''}
+                                onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'number' && (
+                              <input
+                                type="number"
+                                placeholder={fieldDef.placeholder || ''}
+                                value={editLeadCustomData[fieldDef.field_key] || ''}
+                                onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'date' && (
+                              <input
+                                type="date"
+                                placeholder={fieldDef.placeholder || ''}
+                                value={editLeadCustomData[fieldDef.field_key] || ''}
+                                onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'textarea' && (
+                              <textarea
+                                rows={2}
+                                placeholder={fieldDef.placeholder || ''}
+                                value={editLeadCustomData[fieldDef.field_key] || ''}
+                                onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3 pt-2' : 'px-3 py-2'} rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition resize-none`}
+                              />
+                            )}
+                            {fieldDef.field_type === 'dropdown' && (
+                              <select
+                                value={editLeadCustomData[fieldDef.field_key] || ''}
+                                onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition cursor-pointer`}
+                              >
+                                <option value="">{fieldDef.placeholder || '-- Select --'}</option>
+                                {(fieldDef.options || []).map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            )}
+                            {fieldDef.field_type === 'boolean' && (
+                              <div className="flex gap-4 pt-2.5">
+                                {['Yes', 'No'].map((opt) => (
+                                  <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`edit_cf_${fieldDef.field_key}`}
+                                      value={opt}
+                                      checked={editLeadCustomData[fieldDef.field_key] === opt}
+                                      onChange={() => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: opt }))}
+                                      className="accent-emerald-500 cursor-pointer"
+                                    />
+                                    <span className="text-xs font-bold text-slate-655">{opt}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Section 2: Contact Channels */}
               <div className="space-y-4 pt-2">
@@ -2684,86 +2808,7 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              {/* Section 6: Org-Defined Custom Fields (Edit Mode) */}
-              {orgCustomFieldDefs.length > 0 && (
-                <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/40 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider font-mono">Custom Fields ({orgCustomFieldDefs.length} defined)</span>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {orgCustomFieldDefs.map((fieldDef) => (
-                      <div key={fieldDef.id}>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                          {fieldDef.field_label}
-                          {fieldDef.is_required && <span className="text-rose-500 ml-1">*</span>}
-                        </label>
-                        {fieldDef.field_type === 'text' && (
-                          <input
-                            type="text"
-                            value={editLeadCustomData[fieldDef.field_key] || ''}
-                            onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                        {fieldDef.field_type === 'number' && (
-                          <input
-                            type="number"
-                            value={editLeadCustomData[fieldDef.field_key] || ''}
-                            onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                        {fieldDef.field_type === 'date' && (
-                          <input
-                            type="date"
-                            value={editLeadCustomData[fieldDef.field_key] || ''}
-                            onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                        {fieldDef.field_type === 'textarea' && (
-                          <textarea
-                            rows={2}
-                            value={editLeadCustomData[fieldDef.field_key] || ''}
-                            onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition resize-none"
-                          />
-                        )}
-                        {fieldDef.field_type === 'dropdown' && (
-                          <select
-                            value={editLeadCustomData[fieldDef.field_key] || ''}
-                            onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
-                            className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-200 focus:border-indigo-400 focus:outline-none text-xs text-slate-800 transition cursor-pointer"
-                          >
-                            <option value="">-- Select --</option>
-                            {(fieldDef.options || []).map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        )}
-                        {fieldDef.field_type === 'boolean' && (
-                          <div className="flex gap-3">
-                            {['Yes', 'No'].map((opt) => (
-                              <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={`edit_cf_${fieldDef.field_key}`}
-                                  value={opt}
-                                  checked={editLeadCustomData[fieldDef.field_key] === opt}
-                                  onChange={() => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: opt }))}
-                                  className="accent-indigo-500"
-                                />
-                                <span className="text-xs font-bold text-slate-600">{opt}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Submit Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
@@ -2816,7 +2861,7 @@ export default function LeadsPage() {
               <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs space-y-1 shadow-sm">
                 <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px] font-mono">Converting Client:</p>
                 <p className="text-slate-800 font-black text-xs">{selectedLead.firstName} {selectedLead.lastName} ({selectedLead.company})</p>
-                <p className="text-slate-500 text-[10px] pt-1 font-medium leading-relaxed">This will automatically mark the Lead as "Qualified" and generate a Sales pipeline card.</p>
+                <p className="text-slate-500 text-[10px] pt-1 font-medium leading-relaxed">This will automatically mark the Lead as &quot;Qualified&quot; and generate a Sales pipeline card.</p>
               </div>
 
               {/* Deal Title */}

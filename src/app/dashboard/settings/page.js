@@ -9,7 +9,8 @@ import {
   Lock, 
   ChevronRight, 
   Loader2, 
-  Settings 
+  Settings,
+  Link
 } from 'lucide-react';
 
 export default function SettingsDashboardPage() {
@@ -71,6 +72,15 @@ export default function SettingsDashboardPage() {
       href: '/dashboard/settings/modules',
       icon: Sparkles,
       iconColor: isOwner ? 'text-amber-500 bg-amber-50 border-amber-100' : 'text-slate-400 bg-slate-50 border-slate-200',
+      active: isOwner,
+      ownerOnly: true,
+    },
+    {
+      title: 'Meta Lead Integration',
+      description: 'Connect Facebook and Instagram page forms to automatically sync leads to your CRM in real time.',
+      href: '/dashboard/settings/meta',
+      icon: Link,
+      iconColor: isOwner ? 'text-blue-500 bg-blue-50 border-blue-100' : 'text-slate-400 bg-slate-50 border-slate-200',
       active: isOwner,
       ownerOnly: true,
     }

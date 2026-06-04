@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Loader2, ArrowLeft, Zap, Plus, Trash2, Edit2, Check, X,
-  ChevronDown, Settings2, Lightbulb, CheckCircle, RefreshCw, Globe
+  ChevronDown, Settings2, Lightbulb, CheckCircle, RefreshCw, Globe,
+  User, Building, Phone, Mail, Calendar, DollarSign, Briefcase, Info, Hash, MessageCircle, Tag
 } from 'lucide-react';
 
 const FIELD_TYPES = [
@@ -17,9 +18,24 @@ const FIELD_TYPES = [
 ];
 
 const MODULES = [
-  { key: 'leads',    label: 'Leads Directory' },
+  { key: 'leads',    label: 'Leads' },
   { key: 'contacts', label: 'Contacts Index' },
   { key: 'deals',    label: 'Deals Pipeline' },
+];
+
+const FIELD_ICONS = [
+  { value: 'tag', label: 'Tag (Default)', icon: Tag },
+  { value: 'user', label: 'User Profile', icon: User },
+  { value: 'building', label: 'Company/Building', icon: Building },
+  { value: 'phone', label: 'Phone/Call', icon: Phone },
+  { value: 'mail', label: 'Email', icon: Mail },
+  { value: 'globe', label: 'Website/Globe', icon: Globe },
+  { value: 'calendar', label: 'Date/Calendar', icon: Calendar },
+  { value: 'dollarsign', label: 'Money/Dollar', icon: DollarSign },
+  { value: 'briefcase', label: 'Job/Briefcase', icon: Briefcase },
+  { value: 'info', label: 'Info/Detail', icon: Info },
+  { value: 'hash', label: 'Hash/Number', icon: Hash },
+  { value: 'messagecircle', label: 'Chat/WhatsApp', icon: MessageCircle }
 ];
 
 const STANDARD_FIELDS_BY_MODULE = {
@@ -80,6 +96,8 @@ export default function CustomFieldsPage() {
   const [newType, setNewType]           = useState('text');
   const [newOptions, setNewOptions]     = useState('');
   const [newRequired, setNewRequired]   = useState(false);
+  const [newPlaceholder, setNewPlaceholder] = useState('');
+  const [newIconName, setNewIconName]   = useState('tag');
   const [addLoading, setAddLoading]     = useState(false);
   const [addError, setAddError]         = useState('');
 
@@ -88,6 +106,8 @@ export default function CustomFieldsPage() {
   const [editLabel, setEditLabel]       = useState('');
   const [editOptions, setEditOptions]   = useState('');
   const [editRequired, setEditRequired] = useState(false);
+  const [editPlaceholder, setEditPlaceholder] = useState('');
+  const [editIconName, setEditIconName]   = useState('tag');
   const [editLoading, setEditLoading]   = useState(false);
 
   // Quick-add suggestion loading
@@ -146,6 +166,7 @@ export default function CustomFieldsPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) fetchAll(activeModule);
   }, [user, activeModule, fetchAll]);
 
@@ -257,6 +278,8 @@ export default function CustomFieldsPage() {
           field_type: newType,
           options: optionsArr,
           is_required: newRequired,
+          placeholder: newPlaceholder.trim(),
+          icon_name: newIconName,
         }),
       });
       const d = await res.json();
@@ -266,6 +289,8 @@ export default function CustomFieldsPage() {
         setShowAddForm(false);
         setNewLabel(''); setNewKey(''); setNewType('text');
         setNewOptions(''); setNewRequired(false);
+        setNewPlaceholder('');
+        setNewIconName('tag');
         showToast(`✅ Custom field "${d.field.field_label}" added!`);
       } else {
         setAddError(d.error || 'Failed to add field.');
@@ -279,6 +304,8 @@ export default function CustomFieldsPage() {
     setEditLabel(field.field_label);
     setEditOptions((field.options || []).join(', '));
     setEditRequired(field.is_required);
+    setEditPlaceholder(field.placeholder || '');
+    setEditIconName(field.icon_name || 'tag');
   };
 
   const handleSaveEdit = async (id) => {
@@ -290,7 +317,7 @@ export default function CustomFieldsPage() {
       const res = await fetch('/api/tenant/custom-fields', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, field_label: editLabel, options: optionsArr, is_required: editRequired }),
+        body: JSON.stringify({ id, field_label: editLabel, options: optionsArr, is_required: editRequired, placeholder: editPlaceholder.trim(), icon_name: editIconName }),
       });
       const d = await res.json();
       if (res.ok) {
@@ -528,7 +555,7 @@ export default function CustomFieldsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[10px] font-black text-slate-600 mb-1 uppercase tracking-wider">Field Type *</label>
                     <select
@@ -541,17 +568,39 @@ export default function CustomFieldsPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="flex items-end gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newRequired}
-                        onChange={(e) => setNewRequired(e.target.checked)}
-                        className="w-3.5 h-3.5 accent-indigo-500"
-                      />
-                      <span className="text-[11px] font-bold text-slate-600">Required field</span>
-                    </label>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-600 mb-1 uppercase tracking-wider">Placeholder Text</label>
+                    <input
+                      value={newPlaceholder}
+                      onChange={(e) => setNewPlaceholder(e.target.value)}
+                      placeholder="e.g. Enter vehicle model..."
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-600 mb-1 uppercase tracking-wider">Field Icon</label>
+                    <select
+                      value={newIconName}
+                      onChange={(e) => setNewIconName(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
+                      {FIELD_ICONS.map((i) => (
+                        <option key={i.value} value={i.value}>{i.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newRequired}
+                      onChange={(e) => setNewRequired(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-indigo-500"
+                    />
+                    <span className="text-[11px] font-bold text-slate-600">Required field</span>
+                  </label>
                 </div>
 
                 {newType === 'dropdown' && (
@@ -585,7 +634,7 @@ export default function CustomFieldsPage() {
             {/* Fields list */}
             {fields.length === 0 ? (
               <div className="py-16 text-center text-slate-400 text-xs font-semibold italic">
-                No custom fields defined yet. Add suggestions above or click "Add Custom Field".
+                No custom fields defined yet. Add suggestions above or click &quot;Add Custom Field&quot;.
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
@@ -598,7 +647,7 @@ export default function CustomFieldsPage() {
                       {isEditing ? (
                         // ── Inline edit mode ───────────────────────────
                         <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <div>
                               <label className="block text-[9px] font-black text-slate-500 mb-1 uppercase tracking-wider">Label</label>
                               <input
@@ -607,8 +656,28 @@ export default function CustomFieldsPage() {
                                 className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                               />
                             </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-slate-500 mb-1 uppercase tracking-wider">Placeholder</label>
+                              <input
+                                value={editPlaceholder}
+                                onChange={(e) => setEditPlaceholder(e.target.value)}
+                                className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-slate-500 mb-1 uppercase tracking-wider">Field Icon</label>
+                              <select
+                                value={editIconName}
+                                onChange={(e) => setEditIconName(e.target.value)}
+                                className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                              >
+                                {FIELD_ICONS.map((i) => (
+                                  <option key={i.value} value={i.value}>{i.label}</option>
+                                ))}
+                              </select>
+                            </div>
                             {field.field_type === 'dropdown' && (
-                              <div>
+                              <div className="col-span-2 md:col-span-3">
                                 <label className="block text-[9px] font-black text-slate-500 mb-1 uppercase tracking-wider">Options (comma sep.)</label>
                                 <input
                                   value={editOptions}
@@ -656,6 +725,16 @@ export default function CustomFieldsPage() {
                                     Options: {field.options.join(' · ')}
                                   </span>
                                 )}
+                                {field.placeholder && (
+                                  <span className="text-[9px] text-slate-500 italic bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">
+                                    Placeholder: &quot;{field.placeholder}&quot;
+                                  </span>
+                                )}
+                                {field.icon_name && (
+                                  <span className="text-[9px] text-slate-550 italic bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded uppercase font-mono tracking-wider font-semibold">
+                                    Icon: {field.icon_name}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -691,7 +770,7 @@ export default function CustomFieldsPage() {
                     Standard Fields Layout Control — {MODULES.find(m => m.key === activeModule)?.label}
                   </p>
                   <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                    Toggle which standard built-in fields are visible in this module's forms and detail drawers. Hidden fields will not be shown to team members.
+                    Toggle which standard built-in fields are visible in this module&apos;s forms and detail drawers. Hidden fields will not be shown to team members.
                   </p>
                 </div>
 

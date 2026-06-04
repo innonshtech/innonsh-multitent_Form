@@ -14,13 +14,13 @@ export async function GET(req) {
     if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const module = searchParams.get('module') || 'leads';
+    const moduleName = searchParams.get('module') || 'leads';
 
     const { data, error } = await supabase
       .from('custom_field_definitions')
       .select('*')
       .eq('org_id', user.orgId)
-      .eq('module', module)
+      .eq('module', moduleName)
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
@@ -46,7 +46,7 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { module = 'leads', field_key, field_label, field_type, options = [], is_required = false } = body;
+    const { module: moduleName = 'leads', field_key, field_label, field_type, options = [], is_required = false, placeholder = '', icon_name = null } = body;
 
     if (!field_key || !field_label || !field_type) {
       return NextResponse.json({ error: 'field_key, field_label, and field_type are required.' }, { status: 400 });
@@ -63,7 +63,7 @@ export async function POST(req) {
       .from('custom_field_definitions')
       .select('sort_order')
       .eq('org_id', user.orgId)
-      .eq('module', module)
+      .eq('module', moduleName)
       .order('sort_order', { ascending: false })
       .limit(1);
 
@@ -73,12 +73,14 @@ export async function POST(req) {
       .from('custom_field_definitions')
       .insert([{
         org_id: user.orgId,
-        module,
+        module: moduleName,
         field_key: cleanKey,
         field_label: field_label.trim(),
         field_type,
         options: Array.isArray(options) ? options : [],
         is_required: Boolean(is_required),
+        placeholder: placeholder ? placeholder.trim() : '',
+        icon_name: icon_name ? icon_name.trim() : null,
         sort_order: nextOrder,
       }])
       .select('*')
@@ -111,13 +113,15 @@ export async function PUT(req) {
       return NextResponse.json({ error: 'Only organization owners can manage custom fields.' }, { status: 403 });
     }
 
-    const { id, field_label, options, is_required } = await req.json();
+    const { id, field_label, options, is_required, placeholder, icon_name } = await req.json();
     if (!id) return NextResponse.json({ error: 'Field id is required.' }, { status: 400 });
 
     const updatePayload = {};
     if (field_label !== undefined) updatePayload.field_label = field_label.trim();
     if (options !== undefined) updatePayload.options = Array.isArray(options) ? options : [];
     if (is_required !== undefined) updatePayload.is_required = Boolean(is_required);
+    if (placeholder !== undefined) updatePayload.placeholder = placeholder ? placeholder.trim() : '';
+    if (icon_name !== undefined) updatePayload.icon_name = icon_name ? icon_name.trim() : null;
 
     const { data, error } = await supabase
       .from('custom_field_definitions')

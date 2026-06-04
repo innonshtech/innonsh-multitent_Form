@@ -132,7 +132,7 @@ export default function DashboardLayout({ children }) {
     const dealTerm = sectorConf?.dealTerm || 'Deal';
 
     switch (slug) {
-      case 'leads': return `${leadTerm} Directory`;
+      case 'leads': return `${leadTerm}s`;
       case 'contacts': return 'Contacts Directory';
       case 'deals': return `${dealTerm} Pipeline`;
       case 'emails': return 'Email Hub';
@@ -328,7 +328,7 @@ export default function DashboardLayout({ children }) {
       title: 'Core Sales',
       links: [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Leads Directory', href: '/dashboard/leads', icon: Users },
+        { name: 'Leads', href: '/dashboard/leads', icon: Users },
         { name: 'Contacts Directory', href: '/dashboard/contacts', icon: UserCheck },
         { name: 'Deals Pipeline', href: '/dashboard/deals', icon: Briefcase },
         { name: 'Email Hub', href: '/dashboard/emails', icon: Mail },
@@ -436,7 +436,7 @@ export default function DashboardLayout({ children }) {
         if (user?.role === 'sales_admin') {
           const managerAllowed = [
             'Dashboard',
-            'Leads Directory',
+            'Leads',
             'Contacts Directory',
             'Deals Pipeline',
             'Email Hub',
@@ -475,7 +475,7 @@ export default function DashboardLayout({ children }) {
         if (user?.role === 'sales_rep') {
           const repAllowed = [
             'Dashboard',
-            'Leads Directory',
+            'Leads',
             'Contacts Directory',
             'Deals Pipeline',
             'Email Hub',
@@ -528,8 +528,8 @@ export default function DashboardLayout({ children }) {
                 const productTerm = sectorConf.productTerm || 'Product';
                 const dealTerm = sectorConf.dealTerm || 'Deal';
 
-                if (link.name === 'Leads Directory') {
-                  displayName = user?.role === 'sales_rep' ? `My ${leadTerm}s` : `${leadTerm} Directory`;
+                if (link.name === 'Leads') {
+                  displayName = user?.role === 'sales_rep' ? `My ${leadTerm}s` : `${leadTerm}s`;
                 } else if (link.name === 'Deals Pipeline') {
                   displayName = user?.role === 'sales_rep' ? `My ${dealTerm}s` : `${dealTerm} Pipeline`;
                 } else if (link.name === 'Products') {
@@ -541,7 +541,7 @@ export default function DashboardLayout({ children }) {
                 }
               } else {
                 if (user?.role === 'sales_rep') {
-                  if (link.name === 'Leads Directory') displayName = 'My Leads';
+                  if (link.name === 'Leads') displayName = 'My Leads';
                   if (link.name === 'Contacts Directory') displayName = 'My Contacts';
                   if (link.name === 'Deals Pipeline') displayName = 'My Deals';
                   if (link.name === 'Tasks') displayName = 'My Tasks';

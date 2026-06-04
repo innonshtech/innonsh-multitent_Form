@@ -106,7 +106,7 @@ export default function SuperAdminDashboard() {
   };
 
   const availableModulesList = [
-    { key: 'leads', name: 'Leads Directory', desc: 'Manage prospect pipelines and follow-ups' },
+    { key: 'leads', name: 'Leads', desc: 'Manage prospect pipelines and follow-ups' },
     { key: 'deals', name: 'Deals Pipeline', desc: 'Kanban drag-and-drop opportunity board' },
     { key: 'contacts', name: 'Contacts Index', desc: 'Permanent customer contacts registry' },
     { key: 'tasks', name: 'Tasks & Reminders', desc: 'To-do checklists and rep reminders' },
@@ -741,7 +741,7 @@ export default function SuperAdminDashboard() {
                               </div>
                               <div className="min-w-0">
                                 <p className="font-extrabold text-slate-200 truncate leading-none">{org.name}</p>
-                                <span className="text-[9px] text-slate-500 block mt-1.5 font-mono uppercase tracking-wider">Registered: {new Date(org.created_at || Date.now()).toLocaleDateString('en-IN', { dateStyle: 'medium' })} • Sector: {org.sector || 'SOFTWARE_SERVICES'}</span>
+                                <span className="text-[9px] text-slate-500 block mt-1.5 font-mono uppercase tracking-wider">Registered: {org.created_at ? new Date(org.created_at).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'N/A'} • Sector: {org.sector || 'SOFTWARE_SERVICES'}</span>
                               </div>
                             </td>
 
@@ -843,7 +843,7 @@ export default function SuperAdminDashboard() {
                         {moduleRequests.map((req) => {
                           const getModuleDisplayName = (slug) => {
                             switch (slug) {
-                              case 'leads': return 'Leads Directory';
+                              case 'leads': return 'Leads';
                               case 'contacts': return 'Contacts Directory';
                               case 'deals': return 'Deals Pipeline';
                               case 'emails': return 'Email Hub';

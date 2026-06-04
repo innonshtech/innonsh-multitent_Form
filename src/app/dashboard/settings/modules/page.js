@@ -33,7 +33,7 @@ import {
 const ALL_MODULES = [
   {
     key: 'leads',
-    name: 'Leads Directory',
+    name: 'Leads',
     desc: 'Manage prospect pipelines and follow-up workflows',
     icon: Users,
     category: 'Core Sales',

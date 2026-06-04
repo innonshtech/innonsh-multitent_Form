@@ -23,8 +23,29 @@ import {
   AlertTriangle,
   ChevronRight,
   ShieldCheck,
-  Building2
+  Building2,
+  Tag,
+  Hash,
+  DollarSign
 } from 'lucide-react';
+
+const getCustomFieldIcon = (iconName) => {
+  switch (iconName) {
+    case 'user': return User;
+    case 'building': return Building;
+    case 'phone': return Phone;
+    case 'mail': return Mail;
+    case 'globe': return Globe;
+    case 'calendar': return Calendar;
+    case 'dollarsign': return DollarSign;
+    case 'briefcase': return Briefcase;
+    case 'info': return Info;
+    case 'tag': return Tag;
+    case 'hash': return Hash;
+    case 'messagecircle': return MessageCircle;
+    default: return null;
+  }
+};
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState([]);
@@ -141,6 +162,7 @@ export default function ContactsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchContacts();
   }, [search, statusFilter, repFilter]);
 
@@ -416,7 +438,7 @@ export default function ContactsPage() {
           </span>
           <input
             type="text"
-            placeholder="Search by name, company, email..."
+            placeholder="Search by name, organization, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 placeholder-slate-400 transition"
@@ -480,7 +502,7 @@ export default function ContactsPage() {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                   <th className="px-6 py-4">Customer Name</th>
-                  <th className="px-6 py-4">Corporate Company</th>
+                  <th className="px-6 py-4">Organization</th>
                   <th className="px-6 py-4">Contact Channels</th>
                   <th className="px-6 py-4">Zonal Location</th>
                   <th className="px-6 py-4">Account Status</th>
@@ -786,7 +808,7 @@ export default function ContactsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Company Name</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Organization Name</label>
                   <input
                     type="text"
                     placeholder="E.g. Innonsh Tech"
@@ -876,52 +898,64 @@ export default function ContactsPage() {
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-4">
                   <p className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">Sector Specific Information ({sector})</p>
                   <div className="grid grid-cols-2 gap-4">
-                    {orgCustomFieldDefs.map((field) => (
-                      <div key={field.id} className="col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wider mb-1.5">
-                          {field.field_label} {field.is_required && '*'}
-                        </label>
-                        {field.field_type === 'dropdown' ? (
-                          <select
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
-                          >
-                            <option value="">Select option</option>
-                            {(field.options || []).map(opt => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        ) : field.field_type === 'boolean' ? (
-                          <select
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
-                          >
-                            <option value="">Select option</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                          </select>
-                        ) : field.field_type === 'textarea' ? (
-                          <textarea
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition min-h-[60px]"
-                          />
-                        ) : (
-                          <input
-                            type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                      </div>
-                    ))}
+                    {orgCustomFieldDefs.map((field) => {
+                      const IconComponent = field.icon_name ? getCustomFieldIcon(field.icon_name) : null;
+                      return (
+                        <div key={field.id} className="col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wider mb-1.5">
+                            {field.field_label} {field.is_required && '*'}
+                          </label>
+                          <div className={IconComponent ? "relative" : ""}>
+                            {IconComponent && (
+                              <span className={`absolute inset-y-0 left-0 flex pl-3 text-slate-450 pointer-events-none ${field.field_type === 'textarea' ? 'items-start pt-2' : 'items-center'}`}>
+                                <IconComponent className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                            {field.field_type === 'dropdown' ? (
+                              <select
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              >
+                                <option value="">{field.placeholder || 'Select option'}</option>
+                                {(field.options || []).map(opt => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            ) : field.field_type === 'boolean' ? (
+                              <select
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              >
+                                <option value="">Select option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                              </select>
+                            ) : field.field_type === 'textarea' ? (
+                              <textarea
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                placeholder={field.placeholder || ''}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3 pt-2' : 'px-3 py-2'} rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition min-h-[60px]`}
+                              />
+                            ) : (
+                              <input
+                                type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                placeholder={field.placeholder || ''}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1024,7 +1058,7 @@ export default function ContactsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Company Name</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Organization Name</label>
                   <input
                     type="text"
                     value={company}
@@ -1107,52 +1141,64 @@ export default function ContactsPage() {
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-4">
                   <p className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">Sector Specific Information ({sector})</p>
                   <div className="grid grid-cols-2 gap-4">
-                    {orgCustomFieldDefs.map((field) => (
-                      <div key={field.id} className="col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wider mb-1.5">
-                          {field.field_label} {field.is_required && '*'}
-                        </label>
-                        {field.field_type === 'dropdown' ? (
-                          <select
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
-                          >
-                            <option value="">Select option</option>
-                            {(field.options || []).map(opt => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        ) : field.field_type === 'boolean' ? (
-                          <select
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
-                          >
-                            <option value="">Select option</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                          </select>
-                        ) : field.field_type === 'textarea' ? (
-                          <textarea
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition min-h-[60px]"
-                          />
-                        ) : (
-                          <input
-                            type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
-                            value={customFieldsData[field.field_key] || ''}
-                            onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
-                            required={field.is_required}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
-                          />
-                        )}
-                      </div>
-                    ))}
+                    {orgCustomFieldDefs.map((field) => {
+                      const IconComponent = field.icon_name ? getCustomFieldIcon(field.icon_name) : null;
+                      return (
+                        <div key={field.id} className="col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wider mb-1.5">
+                            {field.field_label} {field.is_required && '*'}
+                          </label>
+                          <div className={IconComponent ? "relative" : ""}>
+                            {IconComponent && (
+                              <span className={`absolute inset-y-0 left-0 flex pl-3 text-slate-450 pointer-events-none ${field.field_type === 'textarea' ? 'items-start pt-2' : 'items-center'}`}>
+                                <IconComponent className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                            {field.field_type === 'dropdown' ? (
+                              <select
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              >
+                                <option value="">{field.placeholder || 'Select option'}</option>
+                                {(field.options || []).map(opt => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            ) : field.field_type === 'boolean' ? (
+                              <select
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              >
+                                <option value="">Select option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                              </select>
+                            ) : field.field_type === 'textarea' ? (
+                              <textarea
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                placeholder={field.placeholder || ''}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3 pt-2' : 'px-3 py-2'} rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition min-h-[60px]`}
+                              />
+                            ) : (
+                              <input
+                                type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                required={field.is_required}
+                                placeholder={field.placeholder || ''}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
