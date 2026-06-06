@@ -48,12 +48,38 @@ export function mapLeadToFrontend(lead) {
     followUpType: lead.follow_up_type || 'None',
     nextFollowUpDate: lead.next_follow_up_date || null,
     // Relational join users details mapping
-    assignedTo: lead.users ? { 
+    assignedTo: lead.assignee ? {
+      _id: lead.assignee.id || lead.assignee._id,
+      id: lead.assignee.id || lead.assignee._id,
+      name: lead.assignee.name,
+      email: lead.assignee.email
+    } : (lead.users ? { 
       _id: lead.users.id, 
       id: lead.users.id,
       name: lead.users.name, 
       email: lead.users.email 
-    } : null,
+    } : (lead.assignedTo && typeof lead.assignedTo === 'object' ? {
+      _id: lead.assignedTo._id || lead.assignedTo.id,
+      id: lead.assignedTo._id || lead.assignedTo.id,
+      name: lead.assignedTo.name,
+      email: lead.assignedTo.email
+    } : null)),
+    createdBy: lead.created_by || (lead.createdBy && (lead.createdBy._id || lead.createdBy.id || lead.createdBy)) || null,
+    createdByRole: lead.created_by_role || lead.createdByRole || (lead.creator && lead.creator.role) || (lead.createdBy && lead.createdBy.role) || 'sales_rep',
+    creator: lead.creator ? {
+      _id: lead.creator.id || lead.creator._id,
+      id: lead.creator.id || lead.creator._id,
+      name: lead.creator.name,
+      email: lead.creator.email,
+      role: lead.creator.role
+    } : (lead.createdBy && typeof lead.createdBy === 'object' ? {
+      _id: lead.createdBy._id || lead.createdBy.id,
+      id: lead.createdBy._id || lead.createdBy.id,
+      name: lead.createdBy.name,
+      email: lead.createdBy.email,
+      role: lead.createdBy.role
+    } : null),
+    isPublic: lead.is_public || lead.isPublic || false,
     score: lead.score || 0,
     customFields: lead.custom_fields || [],
     customData: lead.custom_data || {},

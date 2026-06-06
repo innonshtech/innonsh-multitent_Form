@@ -183,6 +183,19 @@ const LeadSchema = new mongoose.Schema(
       ref: 'User',
       default: null, // Null means unassigned lead
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    createdByRole: {
+      type: String,
+      default: 'sales_rep',
+    },
+    isPublic: {
+      type: Boolean,
+      default: false,
+    },
     score: {
       type: Number,
       default: 0,

@@ -104,3 +104,137 @@ export function checkModuleAccess(decodedUser, moduleName) {
   return decodedUser.enabledModules.includes(moduleName);
 }
 
+/**
+ * Verifies if a user has read access to a lead based on creator role and ownership rules
+ * @param {object} lead - Lead object
+ * @param {object} user - Decoded JWT user object
+ * @returns {boolean} Visibility status
+ */
+export function checkLeadVisibility(lead, user, rolesPermissions = null) {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+
+  const isPublic = lead.is_public || lead.isPublic || false;
+  if (isPublic) return true;
+
+  const userId = user.id || user._id;
+  const userRole = user.role;
+
+  // Extract creator and assignee details (handling both Mongo and Supabase shape)
+  const leadCreatedBy = lead.createdBy || lead.created_by;
+  const leadCreatedByRole = lead.createdByRole || lead.created_by_role;
+  const leadAssignedTo = lead.assignedTo || lead.assigned_to;
+
+  const creatorId = (leadCreatedBy && typeof leadCreatedBy === 'object') ? (leadCreatedBy.id || leadCreatedBy._id) : leadCreatedBy;
+  const assigneeId = (leadAssignedTo && typeof leadAssignedTo === 'object') ? (leadAssignedTo.id || leadAssignedTo._id) : leadAssignedTo;
+
+  // Rule 1: Creator or Assignee can always see the lead
+  if (creatorId && creatorId.toString() === userId.toString()) return true;
+  if (assigneeId && assigneeId.toString() === userId.toString()) return true;
+
+  // Check dynamic permissions if provided
+  if (rolesPermissions && rolesPermissions[userRole]) {
+    const rolePerms = rolesPermissions[userRole];
+    // Find permissions array for Leads Directory module
+    const leadsPerm = Array.isArray(rolePerms) 
+      ? rolePerms.find(p => p.module === 'Leads Directory')
+      : rolePerms['Leads Directory'];
+
+    if (leadsPerm) {
+      const readScope = leadsPerm.read; // e.g. 'Global', 'Assigned Only', 'Personal Only', 'Team List only', 'No'
+      if (readScope === 'Global') return true;
+      if (readScope === 'No') return false;
+      if (readScope === 'Team List only') {
+        // Can see if they are the creator or assignee
+        if (creatorId && creatorId.toString() === userId.toString()) return true;
+        if (assigneeId && assigneeId.toString() === userId.toString()) return true;
+        // Or if it was created by a sales rep or sales manager
+        if (leadCreatedByRole === 'sales_rep' || leadCreatedByRole === 'sales_admin') return true;
+        return false;
+      }
+      // If 'Assigned Only' or 'Personal Only', they are checked via Rule 1 (creatorId/assigneeId === userId)
+      if (readScope === 'Assigned Only') return false;
+    }
+  }
+
+  // Rule 2: Legacy leads (created_by is null)
+  if (!creatorId) {
+    if (userRole !== 'sales_rep') {
+      return true; // Owners and managers see all legacy leads
+    }
+    // Sales reps see legacy leads if assigned to them or unassigned
+    return !assigneeId || assigneeId.toString() === userId.toString();
+  }
+
+  // Rule 3: If created by a sales rep, owners and managers can see it, but other sales reps cannot (unless assigned)
+  if (leadCreatedByRole === 'sales_rep') {
+    return userRole === 'owner' || userRole === 'sales_admin';
+  }
+
+  // Rule 4: If created by a manager (sales_admin), owners and managers can see it, but sales reps cannot
+  if (leadCreatedByRole === 'sales_admin') {
+    return userRole === 'owner' || userRole === 'sales_admin';
+  }
+
+  // Rule 5: If created by an owner, other owners, managers and sales reps cannot see it (unless assigned)
+  if (leadCreatedByRole === 'owner') {
+    return false; // already checked creatorId === userId
+  }
+
+  return false;
+}
+
+/**
+ * Verifies if a user has edit/delete access to a lead based on creator role and ownership rules
+ * @param {object} lead - Lead object
+ * @param {object} user - Decoded JWT user object
+ * @param {object} [rolesPermissions] - Dynamic organization permission settings
+ * @returns {boolean} Edit permission status
+ */
+export function checkLeadEditPermission(lead, user, rolesPermissions = null) {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+
+  const userId = user.id || user._id;
+  const userRole = user.role;
+
+  // Check dynamic permissions if provided
+  if (rolesPermissions && rolesPermissions[userRole]) {
+    const rolePerms = rolesPermissions[userRole];
+    const leadsPerm = Array.isArray(rolePerms) 
+      ? rolePerms.find(p => p.module === 'Leads Directory')
+      : rolePerms['Leads Directory'];
+
+    if (leadsPerm) {
+      const writeScope = leadsPerm.write; // 'Yes' or 'No'
+      if (writeScope === 'No') return false;
+      // If writeScope is Yes, we still check if they can see the lead
+      return checkLeadVisibility(lead, user, rolesPermissions);
+    }
+  }
+
+  // Owners and managers can edit/delete any lead they can see
+  if (userRole === 'owner' || userRole === 'sales_admin') {
+    return checkLeadVisibility(lead, user, rolesPermissions);
+  }
+
+  // Sales reps
+  const leadCreatedBy = lead.createdBy || lead.created_by;
+  const leadAssignedTo = lead.assignedTo || lead.assigned_to;
+
+  const creatorId = (leadCreatedBy && typeof leadCreatedBy === 'object') ? (leadCreatedBy.id || leadCreatedBy._id) : leadCreatedBy;
+  const assigneeId = (leadAssignedTo && typeof leadAssignedTo === 'object') ? (leadAssignedTo.id || leadAssignedTo._id) : leadAssignedTo;
+
+  // Sales Rep can edit if they are creator or assignee
+  if (creatorId && creatorId.toString() === userId.toString()) return true;
+  if (assigneeId && assigneeId.toString() === userId.toString()) return true;
+
+  // Sales Rep can edit if unassigned and visible
+  if (!assigneeId) {
+    return checkLeadVisibility(lead, user, rolesPermissions);
+  }
+
+  return false;
+}
+
+

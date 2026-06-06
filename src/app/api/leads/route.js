@@ -41,7 +41,7 @@ export async function GET(req) {
       // Query Supabase
       let queryBuilder = supabase
         .from('leads')
-        .select('*, users(id, name, email), lead_notes(*), lead_attachments(*)');
+        .select('*, assignee:users!assigned_to(id, name, email), creator:users!created_by(id, name, email, role), lead_notes(*), lead_attachments(*)');
 
       // STRICT MULTI-TENANT ISOLATION
       if (decodedUser.orgId) {
@@ -49,14 +49,47 @@ export async function GET(req) {
       }
 
       // STICT ROLE-BASED ACCESS CONTROL (Leads Isolation)
-      if (decodedUser.role === 'sales_rep') {
-        queryBuilder = queryBuilder.or(`assigned_to.eq.${decodedUser.id},assigned_to.is.null`);
-      } else if (assignedToFilter) {
-        if (assignedToFilter === 'all') {
-          queryBuilder = queryBuilder.is('assigned_to', null);
-        } else {
-          queryBuilder = queryBuilder.eq('assigned_to', assignedToFilter);
+      let rolesPermissions = {};
+      if (decodedUser.orgId) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('roles_permissions')
+          .eq('id', decodedUser.orgId)
+          .maybeSingle();
+        if (orgData && orgData.roles_permissions) {
+          rolesPermissions = orgData.roles_permissions;
         }
+      }
+
+      const defaultReadScopes = {
+        owner: 'Global',
+        sales_admin: 'Global',
+        sales_rep: 'Assigned Only'
+      };
+
+      const userRole = decodedUser.role;
+      const rolePerms = rolesPermissions[userRole] || [];
+      const leadsPerm = Array.isArray(rolePerms) 
+        ? rolePerms.find(p => p.module === 'Leads Directory')
+        : rolePerms['Leads Directory'];
+      
+      const readScope = leadsPerm ? leadsPerm.read : defaultReadScopes[userRole] || 'Assigned Only';
+
+      if (readScope === 'Global') {
+        if (assignedToFilter) {
+          if (assignedToFilter === 'all') {
+            queryBuilder = queryBuilder.is('assigned_to', null);
+          } else {
+            queryBuilder = queryBuilder.eq('assigned_to', assignedToFilter);
+          }
+        }
+      } else if (readScope === 'No') {
+        return NextResponse.json({ success: true, leads: [] });
+      } else if (readScope === 'Team List only') {
+        queryBuilder = queryBuilder.or(`created_by.eq.${decodedUser.id},assigned_to.eq.${decodedUser.id},created_by_role.eq.sales_rep,created_by_role.eq.sales_admin,created_by.is.null,is_public.eq.true`);
+      } else {
+        // Assigned Only or Personal Only
+        queryBuilder = queryBuilder.or(`created_by.eq.${decodedUser.id},assigned_to.eq.${decodedUser.id},and(created_by.is.null,assigned_to.is.null),is_public.eq.true`);
       }
 
       // Filters
@@ -112,14 +145,27 @@ export async function GET(req) {
 
       if (decodedUser.role === 'sales_rep') {
         query.$or = [
+          { createdBy: decodedUser.id },
           { assignedTo: decodedUser.id },
-          { assignedTo: null }
+          { $and: [ { createdBy: null }, { assignedTo: null } ] },
+          { isPublic: true }
         ];
-      } else if (assignedToFilter) {
-        if (assignedToFilter === 'all') {
-          query.assignedTo = null;
-        } else {
-          query.assignedTo = assignedToFilter;
+      } else {
+        query.$or = [
+          { createdBy: decodedUser.id },
+          { assignedTo: decodedUser.id },
+          { createdByRole: 'sales_rep' },
+          { createdByRole: 'sales_admin' },
+          { createdBy: null },
+          { isPublic: true }
+        ];
+
+        if (assignedToFilter) {
+          if (assignedToFilter === 'all') {
+            query.assignedTo = null;
+          } else {
+            query.assignedTo = assignedToFilter;
+          }
         }
       }
 
@@ -140,7 +186,9 @@ export async function GET(req) {
         ];
       }
 
-      let mongoLeads = await Lead.find(query).populate('assignedTo', 'name email');
+      let mongoLeads = await Lead.find(query)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name email role');
 
       if (sortBy === 'latest_communication') {
         mongoLeads = mongoLeads.sort((a, b) => {
@@ -220,7 +268,10 @@ export async function POST(req) {
       customFields,
       interestedProduct,
       followUpType,
+      isPublic,
     } = body;
+
+    const finalIsPublic = (decodedUser.role === 'owner') ? (isPublic === true) : false;
 
     if (!firstName) {
       return NextResponse.json(
@@ -364,7 +415,10 @@ export async function POST(req) {
             assigned_to: finalAssignee,
             custom_fields: customFields || [],
             custom_data: body.custom_data || {},
-            org_id: decodedUser.orgId
+            org_id: decodedUser.orgId,
+            created_by: decodedUser.id,
+            created_by_role: decodedUser.role,
+            is_public: finalIsPublic
           }
         ])
         .select('*')
@@ -390,7 +444,7 @@ export async function POST(req) {
       // Fetch freshly joined lead to match response data
       const { data: refreshedLead } = await supabase
         .from('leads')
-        .select('*, users(id, name, email), lead_notes(*), lead_attachments(*)')
+        .select('*, assignee:users!assigned_to(id, name, email), creator:users!created_by(id, name, email, role), lead_notes(*), lead_attachments(*)')
         .eq('id', newLead.id)
         .single();
 
@@ -465,6 +519,9 @@ export async function POST(req) {
         nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
         customFields: customFields || [],
         notes: [],
+        createdBy: decodedUser.id,
+        createdByRole: decodedUser.role,
+        isPublic: finalIsPublic,
       };
 
       let finalAssignee = assignedTo || null;
@@ -511,7 +568,9 @@ export async function POST(req) {
       });
 
       const newLead = await Lead.create(leadData);
-      finalLead = newLead;
+      finalLead = await Lead.findById(newLead._id)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name email role');
 
       if (newLead.nextFollowUpDate) {
         try {

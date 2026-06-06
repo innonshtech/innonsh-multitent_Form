@@ -134,6 +134,7 @@ export default function LeadsPage() {
   const [nextFollowUpDate, setNextFollowUpDate] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [autoAssign, setAutoAssign] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
   const [interestedProduct, setInterestedProduct] = useState('');
   const [followUpType, setFollowUpType] = useState('None');
   const [customFields, setCustomFields] = useState([]);
@@ -171,6 +172,7 @@ export default function LeadsPage() {
   const [editLeadAssignedTo, setEditLeadAssignedTo] = useState('');
   const [editLeadCustomFields, setEditLeadCustomFields] = useState([]);
   const [editLeadCustomData, setEditLeadCustomData] = useState({});
+  const [editLeadIsPublic, setEditLeadIsPublic] = useState(false);
 
   // Convert Deal Form state
   const [dealTitle, setDealTitle] = useState('');
@@ -337,6 +339,7 @@ export default function LeadsPage() {
       customFields,
       autoAssign,
       custom_data: orgCustomFieldValues,
+      isPublic: currentUser?.role === 'owner' ? isPublic : false,
     };
 
     if (assignedTo) {
@@ -394,6 +397,7 @@ export default function LeadsPage() {
     setFollowUpType('None');
     setCustomFields([]);
     setOrgCustomFieldValues({});
+    setIsPublic(false);
     setFormError('');
   };
 
@@ -548,6 +552,7 @@ export default function LeadsPage() {
       setEditLeadAssignedTo('all');
     }
 
+    setEditLeadIsPublic(lead.isPublic || false);
     setEditModalOpen(true);
   };
 
@@ -588,6 +593,7 @@ export default function LeadsPage() {
       nextFollowUpDate: localToUTCISO(editLeadNextFollowUpDate),
       customFields: editLeadCustomFields,
       custom_data: editLeadCustomData,
+      isPublic: currentUser?.role === 'owner' ? editLeadIsPublic : undefined,
     };
 
     if (editLeadAssignedTo) {
@@ -2297,18 +2303,31 @@ export default function LeadsPage() {
                                 </option>
                               ))}
                           </select>
-                          <label className="flex items-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-150 px-3.5 py-2.5 rounded-lg cursor-pointer hover:bg-indigo-100 transition select-none w-fit">
-                            <input
-                              type="checkbox"
-                              checked={autoAssign}
-                              onChange={(e) => {
-                                setAutoAssign(e.target.checked);
-                                if (e.target.checked) setAssignedTo('');
-                              }}
-                              className="rounded text-indigo-650 cursor-pointer"
-                            />
-                            <span>🤖 Auto Distribute (Round-Robin)</span>
-                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            <label className="flex items-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-150 px-3.5 py-2.5 rounded-lg cursor-pointer hover:bg-indigo-100 transition select-none w-fit">
+                              <input
+                                type="checkbox"
+                                checked={autoAssign}
+                                onChange={(e) => {
+                                  setAutoAssign(e.target.checked);
+                                  if (e.target.checked) setAssignedTo('');
+                                }}
+                                className="rounded text-indigo-650 cursor-pointer"
+                              />
+                              <span>🤖 Auto Distribute (Round-Robin)</span>
+                            </label>
+                            {currentUser?.role === 'owner' && (
+                              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-lg cursor-pointer hover:bg-slate-100 transition select-none w-fit">
+                                <input
+                                  type="checkbox"
+                                  checked={isPublic}
+                                  onChange={(e) => setIsPublic(e.target.checked)}
+                                  className="rounded text-slate-600 cursor-pointer"
+                                />
+                                <span>🌐 Public Lead (Share with team)</span>
+                              </label>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2797,6 +2816,17 @@ export default function LeadsPage() {
                                 </option>
                               ))}
                           </select>
+                          {currentUser?.role === 'owner' && (
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-lg cursor-pointer hover:bg-slate-100 transition select-none w-fit">
+                              <input
+                                type="checkbox"
+                                checked={editLeadIsPublic}
+                                onChange={(e) => setEditLeadIsPublic(e.target.checked)}
+                                className="rounded text-slate-600 cursor-pointer"
+                              />
+                              <span>🌐 Public Lead (Share with team)</span>
+                            </label>
+                          )}
                         </div>
                       </div>
                     )}

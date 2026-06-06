@@ -55,6 +55,7 @@ export default function DashboardLayout({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [bellDropdownOpen, setBellDropdownOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   
   // Dynamic Module Activation Requests States
   const [moduleRequests, setModuleRequests] = useState([]);
@@ -696,7 +697,7 @@ export default function DashboardLayout({ children }) {
             {/* REAL-TIME NOTIFICATIONS BELL CONTAINER */}
             <div className="relative">
               <button 
-                onClick={() => setBellDropdownOpen(!bellDropdownOpen)}
+                onClick={() => { setBellDropdownOpen(!bellDropdownOpen); setProfileDropdownOpen(false); }}
                 className="p-1.5 rounded-full hover:bg-slate-105 text-slate-500 hover:text-slate-800 transition relative cursor-pointer"
               >
                 <Bell className="h-4.5 w-4.5" />
@@ -772,9 +773,47 @@ export default function DashboardLayout({ children }) {
               )}
             </div>
 
-            {/* Profile trigger thumbnail */}
-            <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-mono font-black text-slate-600 uppercase">
-              {user?.name?.slice(0, 2)}
+            {/* Profile trigger thumbnail & dropdown */}
+            <div className="relative">
+              <button 
+                onClick={() => { setProfileDropdownOpen(!profileDropdownOpen); setBellDropdownOpen(false); }}
+                className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-[10px] font-mono font-black text-slate-600 uppercase hover:scale-[1.03] active:scale-[0.97] transition cursor-pointer"
+              >
+                {user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'U'}
+              </button>
+
+              {profileDropdownOpen && (
+                <div className="absolute right-0 mt-3 w-48 bg-white border border-slate-200 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-3 duration-250 z-50">
+                  <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                    <p className="text-xs font-bold text-slate-800 truncate leading-none">{user?.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate mt-1.5 font-medium">{user?.email}</p>
+                  </div>
+                  
+                  <div className="py-1">
+                    <Link
+                      href="/dashboard/profile"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-655 hover:bg-slate-50 hover:text-slate-900 transition"
+                    >
+                      <UserCog className="h-4 w-4 text-slate-400" />
+                      Profile Settings
+                    </Link>
+                  </div>
+
+                  <div className="border-t border-slate-100 py-1">
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex items-center gap-2.5 w-full text-left px-4 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>

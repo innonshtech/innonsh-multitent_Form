@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Lock, 
   ShieldCheck, 
@@ -12,11 +12,17 @@ import {
   AlertCircle,
   HelpCircle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Loader2,
+  Save
 } from 'lucide-react';
 
 export default function RolesPermissionsPage() {
   const [selectedRole, setSelectedRole] = useState('sales_rep');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const rolesList = [
     { id: 'owner', name: 'Owner / System Admin', desc: 'Full commercial administrative privileges. Owns global configurations controls, company billing accounts, and rep profiles.', color: 'border-indigo-500 bg-indigo-50 text-indigo-800' },
@@ -24,8 +30,7 @@ export default function RolesPermissionsPage() {
     { id: 'sales_rep', name: 'Sales Representative', desc: 'Ground outreach agent. Interacts with personal assigned leads, creates product quotations, logs calls, and tracks tasks.', color: 'border-blue-500 bg-blue-50 text-blue-800' }
   ];
 
-  // Access Control Lists matrix database mock
-  const permissionsMatrix = {
+  const defaultMatrix = {
     owner: [
       { module: 'Leads Directory', read: 'Global', write: 'Yes', delete: 'Yes' },
       { module: 'Deals Pipeline', read: 'Global', write: 'Yes', delete: 'Yes' },
@@ -58,22 +63,152 @@ export default function RolesPermissionsPage() {
     ]
   };
 
+  const [permissionsMatrix, setPermissionsMatrix] = useState(defaultMatrix);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const userRes = await fetch('/api/auth/me');
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          setUser(userData.user);
+        }
+
+        const permRes = await fetch('/api/tenant/roles-permissions');
+        if (permRes.ok) {
+          const permData = await permRes.json();
+          if (permData.rolesPermissions && Object.keys(permData.rolesPermissions).length > 0) {
+            const merged = { ...defaultMatrix };
+            Object.keys(permData.rolesPermissions).forEach(role => {
+              if (Array.isArray(permData.rolesPermissions[role])) {
+                merged[role] = defaultMatrix[role].map(defPerm => {
+                  const savedPerm = permData.rolesPermissions[role].find(p => p.module === defPerm.module);
+                  return savedPerm ? savedPerm : defPerm;
+                });
+              }
+            });
+            setPermissionsMatrix(merged);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load permissions configuration:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const handleReadScopeChange = (moduleName, value) => {
+    setPermissionsMatrix(prev => {
+      const updated = prev[selectedRole].map(p => {
+        if (p.module === moduleName) {
+          return { ...p, read: value };
+        }
+        return p;
+      });
+      return { ...prev, [selectedRole]: updated };
+    });
+  };
+
+  const handleWriteAccessChange = (moduleName, checked) => {
+    setPermissionsMatrix(prev => {
+      const updated = prev[selectedRole].map(p => {
+        if (p.module === moduleName) {
+          return { ...p, write: checked ? 'Yes' : 'No' };
+        }
+        return p;
+      });
+      return { ...prev, [selectedRole]: updated };
+    });
+  };
+
+  const handleDeleteAccessChange = (moduleName, checked) => {
+    setPermissionsMatrix(prev => {
+      const updated = prev[selectedRole].map(p => {
+        if (p.module === moduleName) {
+          return { ...p, delete: checked ? 'Yes' : 'No' };
+        }
+        return p;
+      });
+      return { ...prev, [selectedRole]: updated };
+    });
+  };
+
+  const handleSaveChanges = async () => {
+    setSaving(true);
+    setSuccessMsg('');
+    try {
+      const res = await fetch('/api/tenant/roles-permissions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rolesPermissions: permissionsMatrix })
+      });
+      if (res.ok) {
+        setSuccessMsg('Permissions updated successfully!');
+        setTimeout(() => setSuccessMsg(''), 3500);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to save roles permissions.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error while saving permissions.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getRoleDisplayName = (id) => {
     return rolesList.find(r => r.id === id)?.name || id;
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-full min-h-[400px] items-center justify-center bg-slate-50 text-slate-800">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+          <p className="text-sm font-semibold text-slate-500">Loading security gates configuration...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isEditable = user?.role === 'owner';
 
   return (
     <div className="space-y-6 h-full relative">
 
       {/* --- HEADER --- */}
-      <div>
-        <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-          <Lock className="h-7 w-7 text-emerald-500" />
-          Roles & Permissions Gates
-        </h1>
-        <p className="text-sm text-slate-500 mt-1 font-medium">
-          Inspect access levels, security matrices, and modular gate parameters across CRM operational roles.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <Lock className="h-7 w-7 text-emerald-500" />
+            Roles & Permissions Gates
+          </h1>
+          <p className="text-sm text-slate-500 mt-1 font-medium">
+            Inspect and configure access levels, security matrices, and modular gate parameters across CRM operational roles.
+          </p>
+        </div>
+        {isEditable && (
+          <button
+            onClick={handleSaveChanges}
+            disabled={saving}
+            className="self-start md:self-auto flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white text-xs font-black rounded-xl shadow-lg transition cursor-pointer"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                <span>Save Changes</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* --- MAIN LAYOUT GAP --- */}
@@ -82,7 +217,7 @@ export default function RolesPermissionsPage() {
         {/* --- LEFT PANEL: ROLE SELECTOR --- */}
         <div className="space-y-4 lg:col-span-1">
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
-            <h3 className="text-[10px] font-black text-slate-450 uppercase tracking-widest font-mono flex items-center gap-1.5 pb-2 border-b border-slate-100">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono flex items-center gap-1.5 pb-2 border-b border-slate-100">
               <ShieldCheck className="h-4 w-4 text-emerald-500" />
               Operational Security Roles
             </h3>
@@ -117,7 +252,7 @@ export default function RolesPermissionsPage() {
           </div>
         </div>
 
-        {/* --- RIGHT PANEL: PERMISSIONS MATRIX MATRIX --- */}
+        {/* --- RIGHT PANEL: PERMISSIONS MATRIX --- */}
         <div className="lg:col-span-2">
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden p-6 space-y-5">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-slate-100 pb-3 gap-2">
@@ -126,9 +261,16 @@ export default function RolesPermissionsPage() {
                 Access Matrix: <span className="text-indigo-650 font-black">{getRoleDisplayName(selectedRole)}</span>
               </h3>
               
-              <span className="text-[9px] font-bold text-slate-400 font-mono">
-                Permissions values updated live
-              </span>
+              <div className="flex items-center gap-3">
+                {successMsg && (
+                  <span className="text-xs font-bold text-emerald-600 animate-pulse">
+                    {successMsg}
+                  </span>
+                )}
+                <span className="text-[9px] font-bold text-slate-400 font-mono">
+                  {isEditable ? 'Interactive Editing Active' : 'Read-Only Gate Matrix'}
+                </span>
+              </div>
             </div>
 
             {/* Table Area */}
@@ -158,49 +300,81 @@ export default function RolesPermissionsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-655 bg-white">
-                  {permissionsMatrix[selectedRole].map((perm, idx) => (
+                  {(permissionsMatrix[selectedRole] || []).map((perm, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50 transition duration-150">
                       <td className="py-3 px-4.5 font-bold text-slate-800">{perm.module}</td>
                       
                       {/* Read Scope */}
                       <td className="py-3 px-4.5 text-center">
-                        <span className={`inline-block px-2.5 py-1 text-[9px] font-black uppercase rounded-full ${
-                          perm.read === 'Global' ? 'bg-indigo-50 text-indigo-700 border border-indigo-150' :
-                          perm.read === 'Assigned Only' ? 'bg-blue-50 text-blue-700 border border-blue-150' :
-                          perm.read === 'Personal Only' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' :
-                          'bg-rose-50 text-rose-700 border border-rose-150'
-                        }`}>
-                          {perm.read}
-                        </span>
+                        {isEditable ? (
+                          <select
+                            value={perm.read}
+                            onChange={(e) => handleReadScopeChange(perm.module, e.target.value)}
+                            className="px-2 py-1 text-xs border border-slate-250 rounded-lg bg-white font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          >
+                            <option value="Global">Global</option>
+                            <option value="Assigned Only">Assigned Only</option>
+                            <option value="Personal Only">Personal Only</option>
+                            <option value="Team List only">Team List only</option>
+                            <option value="No">No</option>
+                          </select>
+                        ) : (
+                          <span className={`inline-block px-2.5 py-1 text-[9px] font-black uppercase rounded-full ${
+                            perm.read === 'Global' ? 'bg-indigo-50 text-indigo-700 border border-indigo-150' :
+                            perm.read === 'Assigned Only' ? 'bg-blue-50 text-blue-700 border border-blue-150' :
+                            perm.read === 'Personal Only' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' :
+                            'bg-rose-50 text-rose-700 border border-rose-150'
+                          }`}>
+                            {perm.read}
+                          </span>
+                        )}
                       </td>
 
                       {/* Write Scope */}
                       <td className="py-3 px-4.5 text-center font-bold">
-                        {perm.write.startsWith('Yes') ? (
-                          <div className="flex items-center justify-center gap-1 text-emerald-600">
-                            <CheckCircle2 className="h-4 w-4 shrink-0" />
-                            <span className="text-[10px]">{perm.write}</span>
-                          </div>
+                        {isEditable ? (
+                          <input
+                            type="checkbox"
+                            checked={perm.write.startsWith('Yes')}
+                            onChange={(e) => handleWriteAccessChange(perm.module, e.target.checked)}
+                            className="h-4.5 w-4.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
                         ) : (
-                          <div className="flex items-center justify-center gap-1 text-slate-400">
-                            <XCircle className="h-4 w-4 shrink-0" />
-                            <span className="text-[10px]">{perm.write}</span>
-                          </div>
+                          perm.write.startsWith('Yes') ? (
+                            <div className="flex items-center justify-center gap-1 text-emerald-600">
+                              <CheckCircle2 className="h-4 w-4 shrink-0" />
+                              <span className="text-[10px]">{perm.write}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1 text-slate-400">
+                              <XCircle className="h-4 w-4 shrink-0" />
+                              <span className="text-[10px]">{perm.write}</span>
+                            </div>
+                          )
                         )}
                       </td>
 
                       {/* Delete Scope */}
                       <td className="py-3 px-4.5 text-center font-bold">
-                        {perm.delete === 'Yes' ? (
-                          <div className="flex items-center justify-center gap-1 text-rose-600">
-                            <CheckCircle2 className="h-4 w-4 shrink-0" />
-                            <span className="text-[10px]">Yes</span>
-                          </div>
+                        {isEditable ? (
+                          <input
+                            type="checkbox"
+                            checked={perm.delete === 'Yes'}
+                            onChange={(e) => handleDeleteAccessChange(perm.module, e.target.checked)}
+                            className="h-4.5 w-4.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                          />
                         ) : (
-                          <div className="flex items-center justify-center gap-1 text-slate-400">
-                            <XCircle className="h-4 w-4 shrink-0" />
-                            <span className="text-[10px]">Restricted</span>
-                          </div>
+                          perm.delete === 'Yes' ? (
+                            <div className="flex items-center justify-center gap-1 text-rose-600">
+                              <CheckCircle2 className="h-4 w-4 shrink-0" />
+                              <span className="text-[10px]">Yes</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1 text-slate-400">
+                              <XCircle className="h-4 w-4 shrink-0" />
+                              <span className="text-[10px]">Restricted</span>
+                            </div>
+                          )
                         )}
                       </td>
                     </tr>
@@ -213,7 +387,7 @@ export default function RolesPermissionsPage() {
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-xs font-semibold leading-relaxed text-slate-500 flex gap-2.5 items-start">
               <HelpCircle className="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" />
               <span>
-                <strong>Sales Representative Privileges Reminder:</strong> For security reasons, reps can only create dynamic invoice files or log follow-up actions for lead folders that are directly assigned to them in the database ledger indexes. Global settings are restricted.
+                <strong>Roles configuration guidelines:</strong> Custom settings are applied in real-time on all API endpoints. Toggling read/write scopes restricts or opens data queries dynamically for the selected CRM role across the team workspace.
               </span>
             </div>
 

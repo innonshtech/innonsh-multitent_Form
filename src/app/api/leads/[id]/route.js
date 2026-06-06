@@ -4,7 +4,7 @@ import User from '@/lib/models/User';
 import Task from '@/lib/models/Task';
 import { supabase } from '@/lib/supabaseClient';
 import { mapLeadToFrontend } from '@/lib/dbMapper';
-import { getUserFromRequest } from '@/lib/auth';
+import { getUserFromRequest, checkLeadVisibility, checkLeadEditPermission } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
 // GET /api/leads/[id] - Fetch single lead details with validation
@@ -17,10 +17,22 @@ export async function GET(req, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    let rolesPermissions = {};
+    if (supabase && decodedUser.orgId) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('roles_permissions')
+        .eq('id', decodedUser.orgId)
+        .maybeSingle();
+      if (orgData && orgData.roles_permissions) {
+        rolesPermissions = orgData.roles_permissions;
+      }
+    }
+
     if (supabase) {
       const { data, error } = await supabase
         .from('leads')
-        .select('*, users(id, name, email), lead_notes(*), lead_attachments(*)')
+        .select('*, assignee:users!assigned_to(id, name, email), creator:users!created_by(id, name, email, role), lead_notes(*), lead_attachments(*)')
         .eq('id', id)
         .maybeSingle();
 
@@ -33,11 +45,8 @@ export async function GET(req, { params }) {
         return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
       }
 
-      // SECURITY CHECK: Sales Rep can only view their own leads OR shared leads (assigned_to is null)
-      if (
-        decodedUser.role === 'sales_rep' && 
-        (data.assigned_to && data.assigned_to !== decodedUser.id)
-      ) {
+      // SECURITY CHECK: Role-based visibility rules
+      if (!checkLeadVisibility(data, decodedUser, rolesPermissions)) {
         return NextResponse.json(
           { error: 'Forbidden. You do not have permission to view this lead.' },
           { status: 403 }
@@ -48,17 +57,16 @@ export async function GET(req, { params }) {
     } else {
       await connectToDatabase();
 
-      const lead = await Lead.findById(id).populate('assignedTo', 'name email');
+      const lead = await Lead.findById(id)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name email role');
 
       if (!lead) {
         return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
       }
 
-      // SECURITY CHECK: Sales Rep can only view their own leads OR shared leads (assignedTo is null)
-      if (
-        decodedUser.role === 'sales_rep' && 
-        (lead.assignedTo && lead.assignedTo._id.toString() !== decodedUser.id)
-      ) {
+      // SECURITY CHECK: Role-based visibility rules
+      if (!checkLeadVisibility(lead, decodedUser)) {
         return NextResponse.json(
           { error: 'Forbidden. You do not have permission to view this lead.' },
           { status: 403 }
@@ -86,10 +94,22 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    let rolesPermissions = {};
+    if (supabase && decodedUser.orgId) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('roles_permissions')
+        .eq('id', decodedUser.orgId)
+        .maybeSingle();
+      if (orgData && orgData.roles_permissions) {
+        rolesPermissions = orgData.roles_permissions;
+      }
+    }
+
     if (supabase) {
       const { data: existingLead, error: fetchError } = await supabase
         .from('leads')
-        .select('*, users(id, name, email)')
+        .select('*, assignee:users!assigned_to(id, name, email), creator:users!created_by(id, name, email, role)')
         .eq('id', id)
         .maybeSingle();
 
@@ -102,11 +122,8 @@ export async function PUT(req, { params }) {
         return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
       }
 
-      // SECURITY CHECK: Sales Rep can only edit their own leads OR shared/all leads
-      if (
-        decodedUser.role === 'sales_rep' && 
-        (existingLead.assigned_to && existingLead.assigned_to !== decodedUser.id)
-      ) {
+      // SECURITY CHECK: Role-based edit permission check
+      if (!checkLeadEditPermission(existingLead, decodedUser, rolesPermissions)) {
         return NextResponse.json(
           { error: 'Forbidden. You do not have permission to edit this lead.' },
           { status: 403 }
@@ -140,6 +157,7 @@ export async function PUT(req, { params }) {
         nextFollowUpDate,
         assignedTo,
         customFields,
+        isPublic,
       } = body;
 
       // Apply basic validations
@@ -208,12 +226,7 @@ export async function PUT(req, { params }) {
       // 4. BUSINESS RULE: Re-assignment check
       let finalAssignee = existingLead.assigned_to;
       if (assignedTo !== undefined) {
-        if (decodedUser.role === 'sales_rep' && assignedTo !== decodedUser.id) {
-          return NextResponse.json(
-            { error: 'Forbidden. Only Owners and Sales Managers can assign leads.' },
-            { status: 403 }
-          );
-        }
+        // Sales representatives are allowed to assign leads under updated rules
 
         if (assignedTo === 'all') {
           finalAssignee = null;
@@ -287,6 +300,12 @@ export async function PUT(req, { params }) {
       updates.lost_reason = targetStatus === 'Lost' ? targetLostReason : '';
       updates.assigned_to = finalAssignee;
 
+      if (isPublic !== undefined) {
+        if (decodedUser.role === 'owner') {
+          updates.is_public = isPublic === true;
+        }
+      }
+
       const { data: updatedLead, error: updateError } = await supabase
         .from('leads')
         .update(updates)
@@ -355,7 +374,7 @@ export async function PUT(req, { params }) {
       // Fetch populated fresh document to return to client
       const { data: refreshedLead, error: refreshError } = await supabase
         .from('leads')
-        .select('*, users(id, name, email), lead_notes(*), lead_attachments(*)')
+        .select('*, assignee:users!assigned_to(id, name, email), creator:users!created_by(id, name, email, role), lead_notes(*), lead_attachments(*)')
         .eq('id', id)
         .single();
 
@@ -373,17 +392,14 @@ export async function PUT(req, { params }) {
     } else {
       await connectToDatabase();
 
-      const lead = await Lead.findById(id);
+      const lead = await Lead.findById(id).populate('createdBy', 'name email role');
 
       if (!lead) {
         return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
       }
 
-      // SECURITY CHECK: Sales Rep can only edit their own leads OR shared/all leads
-      if (
-        decodedUser.role === 'sales_rep' && 
-        (lead.assignedTo && lead.assignedTo.toString() !== decodedUser.id)
-      ) {
+      // SECURITY CHECK: Role-based edit permission check
+      if (!checkLeadEditPermission(lead, decodedUser)) {
         return NextResponse.json(
           { error: 'Forbidden. You do not have permission to edit this lead.' },
           { status: 403 }
@@ -417,6 +433,7 @@ export async function PUT(req, { params }) {
         nextFollowUpDate,
         assignedTo,
         customFields,
+        isPublic,
       } = body;
 
       // Apply basic validations
@@ -523,12 +540,7 @@ export async function PUT(req, { params }) {
 
       // SECURITY CHECK ON RE-ASSIGNMENT:
       if (assignedTo !== undefined) {
-        if (decodedUser.role === 'sales_rep' && assignedTo !== decodedUser.id) {
-          return NextResponse.json(
-            { error: 'Forbidden. Only Owners and Sales Managers can assign leads.' },
-            { status: 403 }
-          );
-        }
+        // Sales representatives are allowed to assign leads under updated rules
 
         if (assignedTo === 'all') {
           lead.assignedTo = null;
@@ -540,6 +552,12 @@ export async function PUT(req, { params }) {
           lead.assignedTo = assignedTo;
         } else {
           lead.assignedTo = null;
+        }
+      }
+
+      if (isPublic !== undefined) {
+        if (decodedUser.role === 'owner') {
+          lead.isPublic = isPublic === true;
         }
       }
 
@@ -582,7 +600,9 @@ export async function PUT(req, { params }) {
         }
       }
       
-      const updatedLead = await Lead.findById(id).populate('assignedTo', 'name email');
+      const updatedLead = await Lead.findById(id)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name email role');
 
       return NextResponse.json({
         success: true,
@@ -609,7 +629,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // SECURITY CHECK: Only Owner and Sales Admin are authorized to delete data
+    // SECURITY CHECK: Sales representatives cannot delete leads
     if (decodedUser.role === 'sales_rep') {
       return NextResponse.json(
         { error: 'Forbidden. Sales representatives cannot delete leads. Please contact your manager.' },
@@ -617,10 +637,22 @@ export async function DELETE(req, { params }) {
       );
     }
 
+    let rolesPermissions = {};
+    if (supabase && decodedUser.orgId) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('roles_permissions')
+        .eq('id', decodedUser.orgId)
+        .maybeSingle();
+      if (orgData && orgData.roles_permissions) {
+        rolesPermissions = orgData.roles_permissions;
+      }
+    }
+
     if (supabase) {
       const { data: lead, error: fetchError } = await supabase
         .from('leads')
-        .select('*')
+        .select('id, assigned_to, created_by, created_by_role, is_public')
         .eq('id', id)
         .maybeSingle();
 
@@ -631,6 +663,14 @@ export async function DELETE(req, { params }) {
 
       if (!lead) {
         return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
+      }
+
+      // SECURITY CHECK: Role-based delete permission check (e.g. owner cannot delete another owner's lead they can't see)
+      if (!checkLeadEditPermission(lead, decodedUser, rolesPermissions)) {
+        return NextResponse.json(
+          { error: 'Forbidden. You do not have permission to delete this lead.' },
+          { status: 403 }
+        );
       }
 
       const { error: deleteError } = await supabase
@@ -651,11 +691,20 @@ export async function DELETE(req, { params }) {
     } else {
       await connectToDatabase();
 
-      const deletedLead = await Lead.findByIdAndDelete(id);
-
-      if (!deletedLead) {
+      const lead = await Lead.findById(id).populate('createdBy', 'name email role');
+      if (!lead) {
         return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
       }
+
+      // SECURITY CHECK: Role-based delete permission check
+      if (!checkLeadEditPermission(lead, decodedUser)) {
+        return NextResponse.json(
+          { error: 'Forbidden. You do not have permission to delete this lead.' },
+          { status: 403 }
+        );
+      }
+
+      await Lead.findByIdAndDelete(id);
 
       return NextResponse.json({
         success: true,

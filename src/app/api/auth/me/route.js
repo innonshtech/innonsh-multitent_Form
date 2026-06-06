@@ -33,6 +33,7 @@ export async function GET(req) {
 
     let userSectorId = 'SOFTWARE_SERVICES';
     let userSectorName = 'Software Services';
+    let userRolesPermissions = {};
     let sectorConfig = {
       leadTerm: 'Lead',
       productTerm: 'Product',
@@ -64,7 +65,7 @@ export async function GET(req) {
         if (data.org_id && !data.is_super_admin) {
           const { data: orgData, error: orgError } = await supabase
             .from('organizations')
-            .select('name, enabled_modules, gstin, sector')
+            .select('name, enabled_modules, gstin, sector, roles_permissions')
             .eq('id', data.org_id)
             .maybeSingle();
           if (orgError) {
@@ -73,6 +74,7 @@ export async function GET(req) {
             userCompanyName = orgData.name;
             userEnabledModules = orgData.enabled_modules || [];
             userGstin = orgData.gstin || '';
+            userRolesPermissions = orgData.roles_permissions || {};
             const sectorIdVal = orgData.sector || 'SOFTWARE_SERVICES';
 
             // Fetch sector config details
@@ -132,6 +134,7 @@ export async function GET(req) {
         sectorId: userSectorId,
         sectorName: userSectorName,
         sectorConfig,
+        rolesPermissions: userRolesPermissions,
       },
     });
   } catch (error) {
