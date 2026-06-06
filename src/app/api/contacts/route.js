@@ -1,6 +1,7 @@
 import connectToDatabase from '@/lib/db';
 import Contact from '@/lib/models/Contact';
 import User from '@/lib/models/User';
+import ClientOrganization from '@/lib/models/ClientOrganization';
 import { supabase } from '@/lib/supabaseClient';
 import { mapContactToFrontend } from '@/lib/dbMapper';
 import { getUserFromRequest, checkModuleAccess } from '@/lib/auth';
@@ -33,7 +34,7 @@ export async function GET(req) {
     if (supabase) {
       let queryBuilder = supabase
         .from('contacts')
-        .select('*, users(id, name, email, role)');
+        .select('*, users(id, name, email, role), client_organizations(*)');
 
       // STRICT MULTI-TENANT ISOLATION
       if (decodedUser.orgId) {
@@ -96,6 +97,7 @@ export async function GET(req) {
 
       const mongoContacts = await Contact.find(query)
         .populate('assignedTo', 'name email role')
+        .populate('organizationId')
         .sort({ createdAt: -1 });
 
       contacts = mongoContacts;
@@ -143,6 +145,7 @@ export async function POST(req) {
       state,
       country,
       assignedTo,
+      organizationId,
       status,
       customData
     } = body;
@@ -195,6 +198,39 @@ export async function POST(req) {
         }
       }
 
+      // Find or create Client Organization in Supabase
+      let finalOrgId = organizationId;
+      if (!finalOrgId && company && company.trim()) {
+        const companyName = company.trim();
+        const { data: existingOrg } = await supabase
+          .from('client_organizations')
+          .select('id')
+          .eq('org_id', decodedUser.orgId)
+          .ilike('name', companyName)
+          .maybeSingle();
+
+        if (existingOrg) {
+          finalOrgId = existingOrg.id;
+        } else {
+          const { data: newOrg } = await supabase
+            .from('client_organizations')
+            .insert([
+              {
+                org_id: decodedUser.orgId,
+                name: companyName,
+                city: city || '',
+                state: state || '',
+                country: country || 'India',
+                assigned_to: targetAssignee,
+                custom_data: {}
+              }
+            ])
+            .select('id')
+            .single();
+          if (newOrg) finalOrgId = newOrg.id;
+        }
+      }
+
       // Insert into Supabase
       const { data: newContact, error: insertError } = await supabase
         .from('contacts')
@@ -210,6 +246,7 @@ export async function POST(req) {
             city: city || '',
             state: state || '',
             country: country || 'India',
+            organization_id: finalOrgId || null,
             assigned_to: targetAssignee,
             status: status || 'Active',
             org_id: decodedUser.orgId,
@@ -224,10 +261,10 @@ export async function POST(req) {
         throw insertError;
       }
 
-      // Fresh fetch to fetch user join details
+      // Fresh fetch to fetch user join details and client organization
       const { data: refreshedContact } = await supabase
         .from('contacts')
-        .select('*, users(id, name, email, role)')
+        .select('*, users(id, name, email, role), client_organizations(*)')
         .eq('id', newContact.id)
         .single();
 
@@ -257,6 +294,31 @@ export async function POST(req) {
         }
       }
 
+      // Find or create Client Organization in Mongoose
+      let finalOrgId = organizationId;
+      if (!finalOrgId && company && company.trim()) {
+        const companyName = company.trim();
+        let existingOrg = await ClientOrganization.findOne({
+          orgId: decodedUser.orgId,
+          name: { $regex: new RegExp(`^${companyName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+        });
+
+        if (existingOrg) {
+          finalOrgId = existingOrg._id;
+        } else {
+          const newOrg = await ClientOrganization.create({
+            orgId: decodedUser.orgId,
+            name: companyName,
+            city: city || '',
+            state: state || '',
+            country: country || 'India',
+            assignedTo: targetAssignee,
+            customData: {}
+          });
+          finalOrgId = newOrg._id;
+        }
+      }
+
       const mongoContact = await Contact.create({
         firstName: firstName.trim(),
         lastName: lastName || '',
@@ -268,11 +330,14 @@ export async function POST(req) {
         city: city || '',
         state: state || '',
         country: country || 'India',
+        organizationId: finalOrgId || null,
         assignedTo: targetAssignee,
         status: status || 'Active'
       });
 
-      finalContact = mongoContact;
+      finalContact = await Contact.findById(mongoContact._id)
+        .populate('organizationId')
+        .populate('assignedTo', 'name email role');
     }
 
     return NextResponse.json({

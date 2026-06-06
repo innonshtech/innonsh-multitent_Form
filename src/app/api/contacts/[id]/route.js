@@ -1,5 +1,6 @@
 import connectToDatabase from '@/lib/db';
 import Contact from '@/lib/models/Contact';
+import ClientOrganization from '@/lib/models/ClientOrganization';
 import { supabase } from '@/lib/supabaseClient';
 import { mapContactToFrontend } from '@/lib/dbMapper';
 import { getUserFromRequest } from '@/lib/auth';
@@ -18,7 +19,7 @@ export async function PUT(req, { params }) {
     // 1. DYNAMIC DATABASE DETECTOR
     if (supabase) {
       // Query Supabase
-      let query = supabase.from('contacts').select('*').eq('id', id);
+      let query = supabase.from('contacts').select('*, client_organizations(*)').eq('id', id);
       if (decodedUser.orgId) {
         query = query.eq('org_id', decodedUser.orgId);
       }
@@ -57,6 +58,7 @@ export async function PUT(req, { params }) {
         state,
         country,
         assignedTo,
+        organizationId,
         status,
         customData
       } = body;
@@ -119,12 +121,52 @@ export async function PUT(req, { params }) {
         updates.assigned_to = assignedTo || null;
       }
 
+      // Find or create Client Organization in Supabase if company name changed
+      let finalOrgId = organizationId;
+      if (finalOrgId === undefined && company !== undefined && company.trim() !== (contact.company || '')) {
+        if (company.trim() === '') {
+          finalOrgId = null;
+        } else {
+          const companyName = company.trim();
+          const { data: existingOrg } = await supabase
+            .from('client_organizations')
+            .select('id')
+            .eq('org_id', decodedUser.orgId)
+            .ilike('name', companyName)
+            .maybeSingle();
+
+          if (existingOrg) {
+            finalOrgId = existingOrg.id;
+          } else {
+            const { data: newOrg } = await supabase
+              .from('client_organizations')
+              .insert([
+                {
+                  org_id: decodedUser.orgId,
+                  name: companyName,
+                  city: city !== undefined ? city.trim() : (contact.city || ''),
+                  state: state !== undefined ? state.trim() : (contact.state || ''),
+                  country: country !== undefined ? country.trim() : (contact.country || 'India'),
+                  assigned_to: updates.assigned_to !== undefined ? updates.assigned_to : contact.assigned_to,
+                  custom_data: {}
+                }
+              ])
+              .select('id')
+              .single();
+            if (newOrg) finalOrgId = newOrg.id;
+          }
+        }
+      }
+      if (finalOrgId !== undefined) {
+        updates.organization_id = finalOrgId;
+      }
+
       let updateQuery = supabase.from('contacts').update(updates).eq('id', id);
       if (decodedUser.orgId) {
         updateQuery = updateQuery.eq('org_id', decodedUser.orgId);
       }
       const { data: updatedContact, error: updateError } = await updateQuery
-        .select('*, users(id, name, email, role)')
+        .select('*, users(id, name, email, role), client_organizations(*)')
         .single();
 
       if (updateError) {
@@ -172,6 +214,7 @@ export async function PUT(req, { params }) {
         state,
         country,
         assignedTo,
+        organizationId,
         status
       } = body;
 
@@ -226,12 +269,48 @@ export async function PUT(req, { params }) {
         contact.assignedTo = assignedTo || null;
       }
 
+      // Find or create Client Organization in Mongoose if company name changed
+      let finalOrgId = organizationId;
+      if (finalOrgId === undefined && company !== undefined && company.trim() !== (contact.company || '')) {
+        if (company.trim() === '') {
+          finalOrgId = null;
+        } else {
+          const companyName = company.trim();
+          let existingOrg = await ClientOrganization.findOne({
+            orgId: decodedUser.orgId,
+            name: { $regex: new RegExp(`^${companyName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+          });
+
+          if (existingOrg) {
+            finalOrgId = existingOrg._id;
+          } else {
+            const newOrg = await ClientOrganization.create({
+              orgId: decodedUser.orgId,
+              name: companyName,
+              city: city !== undefined ? city.trim() : (contact.city || ''),
+              state: state !== undefined ? state.trim() : (contact.state || ''),
+              country: country !== undefined ? country.trim() : (contact.country || 'India'),
+              assignedTo: contact.assignedTo,
+              customData: {}
+            });
+            finalOrgId = newOrg._id;
+          }
+        }
+      }
+      if (finalOrgId !== undefined) {
+        contact.organizationId = finalOrgId;
+      }
+
       await contact.save();
+
+      const populatedContact = await Contact.findById(contact._id)
+        .populate('organizationId')
+        .populate('assignedTo', 'name email role');
 
       return NextResponse.json({
         success: true,
         message: 'Customer Contact details updated successfully.',
-        contact
+        contact: populatedContact
       });
     }
   } catch (error) {

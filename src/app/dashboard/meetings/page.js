@@ -282,6 +282,34 @@ export default function MeetingsPage() {
   const offlineCount = meetings.filter(m => m.locationType === 'Offline').length;
   const completedCount = meetings.filter(m => m.status === 'Completed').length;
 
+  // Additional Detailed Scheduling Insights (Meetings Overview Dashboard)
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  
+  const currentDay = now.getDay();
+  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - currentDay);
+  const endOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - currentDay + 6, 23, 59, 59, 999);
+
+  const todayMeetingsCount = meetings.filter(m => {
+    const d = new Date(m.startTime);
+    return d >= startOfToday && d <= endOfToday;
+  }).length;
+
+  const upcomingMeetingsCount = meetings.filter(m => {
+    return m.status === 'Scheduled' && new Date(m.startTime) > now;
+  }).length;
+
+  const completedThisWeekCount = meetings.filter(m => {
+    const d = new Date(m.startTime);
+    return m.status === 'Completed' && d >= startOfWeek && d <= endOfWeek;
+  }).length;
+
+  const cancelledThisWeekCount = meetings.filter(m => {
+    const d = new Date(m.startTime);
+    return m.status === 'Cancelled' && d >= startOfWeek && d <= endOfWeek;
+  }).length;
+
   return (
     <div className="space-y-6 relative h-full">
       
@@ -317,47 +345,47 @@ export default function MeetingsPage() {
 
       {/* --- ANALYTICAL SUMMARY CARD GRID --- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in duration-350">
-        {/* Total Meetings */}
+        {/* Today's Meetings */}
         <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Scheduled Meetings</span>
-            <span className="text-2xl font-black text-slate-800 block mt-1">{totalMeetings}</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Today's Meetings</span>
+            <span className="text-2xl font-black text-slate-800 block mt-1">{todayMeetingsCount}</span>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
+          <div className="h-10 w-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+            <Clock className="h-5 w-5" />
+          </div>
+        </div>
+
+        {/* Upcoming Meetings */}
+        <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Upcoming Meetings</span>
+            <span className="text-2xl font-black text-amber-655 block mt-1">{upcomingMeetingsCount}</span>
+          </div>
+          <div className="h-10 w-10 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500">
             <Calendar className="h-5 w-5" />
           </div>
         </div>
 
-        {/* Online Meetings */}
+        {/* Completed This Week */}
         <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Online Video Demos</span>
-            <span className="text-2xl font-black text-indigo-650 block mt-1">{onlineCount}</span>
-          </div>
-          <div className="h-10 w-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500">
-            <Video className="h-5 w-5" />
-          </div>
-        </div>
-
-        {/* Offline Meetings */}
-        <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Physical Site Visits</span>
-            <span className="text-2xl font-black text-amber-600 block mt-1">{offlineCount}</span>
-          </div>
-          <div className="h-10 w-10 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500">
-            <MapPin className="h-5 w-5" />
-          </div>
-        </div>
-
-        {/* Completed Meetings */}
-        <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Demos Completed</span>
-            <span className="text-2xl font-black text-emerald-600 block mt-1">{completedCount}</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Completed This Week</span>
+            <span className="text-2xl font-black text-emerald-600 block mt-1">{completedThisWeekCount}</span>
           </div>
           <div className="h-10 w-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500">
             <CheckCircle className="h-5 w-5" />
+          </div>
+        </div>
+
+        {/* Cancelled This Week */}
+        <div className="bg-white border border-slate-200 p-4.5 rounded-xl shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Cancelled This Week</span>
+            <span className="text-2xl font-black text-rose-600 block mt-1">{cancelledThisWeekCount}</span>
+          </div>
+          <div className="h-10 w-10 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500">
+            <Ban className="h-5 w-5" />
           </div>
         </div>
       </div>

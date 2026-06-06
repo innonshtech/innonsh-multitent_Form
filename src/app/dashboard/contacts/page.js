@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { 
   Loader2, 
   Search, 
@@ -49,6 +50,7 @@ const getCustomFieldIcon = (iconName) => {
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState([]);
+  const [clientOrganizations, setClientOrganizations] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [salesReps, setSalesReps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,18 @@ export default function ContactsPage() {
     }, 4000);
   };
 
+  const fetchClientOrganizations = async () => {
+    try {
+      const res = await fetch('/api/client-organizations');
+      if (res.ok) {
+        const data = await res.json();
+        setClientOrganizations(data.organizations || []);
+      }
+    } catch (err) {
+      console.error('Fetch client orgs failed:', err);
+    }
+  };
+
   // Fetch current user and session details
   useEffect(() => {
     async function initContactsPage() {
@@ -132,6 +146,7 @@ export default function ContactsPage() {
             const suggData = await suggRes.json();
             setSector(suggData.sector || 'General');
           }
+          fetchClientOrganizations();
         }
       } catch (err) {
         console.error('Contacts page init failed:', err);
@@ -154,6 +169,7 @@ export default function ContactsPage() {
         const data = await res.json();
         setContacts(data.contacts || []);
       }
+      fetchClientOrganizations();
     } catch (err) {
       console.error('Fetch contacts failed:', err);
     } finally {
@@ -189,6 +205,13 @@ export default function ContactsPage() {
   const handleCreateContact = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+
     setActionLoading(true);
 
     const contactData = {
@@ -235,6 +258,13 @@ export default function ContactsPage() {
   const handleUpdateContact = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+
     setActionLoading(true);
 
     const contactData = {
@@ -530,8 +560,17 @@ export default function ContactsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-bold text-slate-700">
-                      {contact.company || <span className="text-slate-400 italic">Individual Account</span>}
+                    <td className="px-6 py-4 font-bold text-slate-700" onClick={(e) => { if (contact.organization) e.stopPropagation(); }}>
+                      {contact.organization ? (
+                        <Link 
+                          href={`/dashboard/client-organizations?search=${encodeURIComponent(contact.organization.name)}`}
+                          className="text-emerald-600 font-extrabold hover:text-emerald-500 hover:underline"
+                        >
+                          🏢 {contact.organization.name}
+                        </Link>
+                      ) : (
+                        contact.company || <span className="text-slate-400 italic">Individual Account</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 space-y-1">
                       {contact.email && (
@@ -612,9 +651,16 @@ export default function ContactsPage() {
                   <h2 className="text-sm font-black text-slate-800 leading-tight">
                     {selectedContact.firstName} {selectedContact.lastName}
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5 font-bold">
-                    {selectedContact.company || 'Individual Client'}
-                  </p>
+                  <div className="text-xs text-slate-400 mt-0.5 font-bold">
+                    {selectedContact.organization ? (
+                      <Link 
+                        href={`/dashboard/client-organizations?search=${encodeURIComponent(selectedContact.organization.name)}`}
+                        className="text-emerald-600 font-extrabold hover:text-emerald-500 hover:underline"
+                      >
+                        🏢 {selectedContact.organization.name}
+                      </Link>
+                    ) : (selectedContact.company || 'Individual Client')}
+                  </div>
                 </div>
               </div>
               
@@ -811,11 +857,17 @@ export default function ContactsPage() {
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Organization Name</label>
                   <input
                     type="text"
+                    list="organizations-datalist"
                     placeholder="E.g. Innonsh Tech"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                   />
+                  <datalist id="organizations-datalist">
+                    {clientOrganizations.map(o => (
+                      <option key={o._id || o.id} value={o.name} />
+                    ))}
+                  </datalist>
                 </div>
                 {!hiddenStandardFields.includes('contacts:designation') && (
                   <div>
@@ -848,7 +900,7 @@ export default function ContactsPage() {
                     type="text"
                     placeholder="+91 998877"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                   />
                 </div>
@@ -862,7 +914,7 @@ export default function ContactsPage() {
                       type="text"
                       placeholder="99999"
                       value={whatsapp}
-                      onChange={(e) => setWhatsapp(e.target.value)}
+                      onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, ''))}
                       className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                     />
                   </div>
@@ -942,9 +994,19 @@ export default function ContactsPage() {
                                 placeholder={field.placeholder || ''}
                                 className={`w-full ${IconComponent ? 'pl-9 pr-3 pt-2' : 'px-3 py-2'} rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition min-h-[60px]`}
                               />
+                            ) : field.field_type === 'number' ? (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value.replace(/\D/g, '') }))}
+                                required={field.is_required}
+                                placeholder={field.placeholder || ''}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
                             ) : (
                               <input
-                                type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
+                                type={field.field_type === 'date' ? 'date' : 'text'}
                                 value={customFieldsData[field.field_key] || ''}
                                 onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
                                 required={field.is_required}
@@ -1061,10 +1123,16 @@ export default function ContactsPage() {
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Organization Name</label>
                   <input
                     type="text"
+                    list="organizations-datalist"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                   />
+                  <datalist id="organizations-datalist">
+                    {clientOrganizations.map(o => (
+                      <option key={o._id || o.id} value={o.name} />
+                    ))}
+                  </datalist>
                 </div>
                 {!hiddenStandardFields.includes('contacts:designation') && (
                   <div>
@@ -1094,7 +1162,7 @@ export default function ContactsPage() {
                   <input
                     type="text"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                   />
                 </div>
@@ -1107,7 +1175,7 @@ export default function ContactsPage() {
                     <input
                       type="text"
                       value={whatsapp}
-                      onChange={(e) => setWhatsapp(e.target.value)}
+                      onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, ''))}
                       className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                     />
                   </div>
@@ -1185,9 +1253,19 @@ export default function ContactsPage() {
                                 placeholder={field.placeholder || ''}
                                 className={`w-full ${IconComponent ? 'pl-9 pr-3 pt-2' : 'px-3 py-2'} rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition min-h-[60px]`}
                               />
+                            ) : field.field_type === 'number' ? (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={customFieldsData[field.field_key] || ''}
+                                onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value.replace(/\D/g, '') }))}
+                                required={field.is_required}
+                                placeholder={field.placeholder || ''}
+                                className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-lg bg-white border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
+                              />
                             ) : (
                               <input
-                                type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
+                                type={field.field_type === 'date' ? 'date' : 'text'}
                                 value={customFieldsData[field.field_key] || ''}
                                 onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.field_key]: e.target.value }))}
                                 required={field.is_required}

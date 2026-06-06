@@ -103,6 +103,7 @@ export default function DashboardLayout({ children }) {
     '/dashboard/support': 'support',
     '/dashboard/leads': 'leads',
     '/dashboard/contacts': 'contacts',
+    '/dashboard/client-organizations': 'contacts',
     '/dashboard/deals': 'deals',
     '/dashboard/emails': 'emails',
     '/dashboard/tasks': 'tasks',
@@ -330,6 +331,7 @@ export default function DashboardLayout({ children }) {
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Leads', href: '/dashboard/leads', icon: Users },
         { name: 'Contacts Directory', href: '/dashboard/contacts', icon: UserCheck },
+        { name: 'Client Organizations', href: '/dashboard/client-organizations', icon: Building2 },
         { name: 'Deals Pipeline', href: '/dashboard/deals', icon: Briefcase },
         { name: 'Email Hub', href: '/dashboard/emails', icon: Mail },
       ]
@@ -438,6 +440,7 @@ export default function DashboardLayout({ children }) {
             'Dashboard',
             'Leads',
             'Contacts Directory',
+            'Client Organizations',
             'Deals Pipeline',
             'Email Hub',
             'Tasks',
@@ -477,6 +480,7 @@ export default function DashboardLayout({ children }) {
             'Dashboard',
             'Leads',
             'Contacts Directory',
+            'Client Organizations',
             'Deals Pipeline',
             'Email Hub',
             'Tasks',
@@ -536,6 +540,8 @@ export default function DashboardLayout({ children }) {
                   displayName = `${productTerm}s`;
                 } else if (link.name === 'Contacts Directory' && user?.role === 'sales_rep') {
                   displayName = 'My Contacts';
+                } else if (link.name === 'Client Organizations' && user?.role === 'sales_rep') {
+                  displayName = 'My Organizations';
                 } else if (link.name === 'Tasks' && user?.role === 'sales_rep') {
                   displayName = 'My Tasks';
                 }

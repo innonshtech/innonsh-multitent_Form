@@ -65,6 +65,11 @@ const ContactSchema = new mongoose.Schema(
       ref: 'Lead',
       default: null, // Tracks if this Contact was converted from a specific Lead
     },
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ClientOrganization',
+      default: null,
+    },
     status: {
       type: String,
       enum: ['Active', 'Inactive'],

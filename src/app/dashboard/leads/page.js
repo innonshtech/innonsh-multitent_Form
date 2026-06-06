@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Loader2, 
   Search, 
@@ -75,6 +76,7 @@ const getCustomFieldIcon = (iconName) => {
 };
 
 export default function LeadsPage() {
+  const router = useRouter();
   // Page core states
   const [leads, setLeads] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -300,6 +302,13 @@ export default function LeadsPage() {
   const handleCreateLead = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+
     setActionLoading(true);
 
     const leadData = {
@@ -470,6 +479,7 @@ export default function LeadsPage() {
         setSelectedLead(null);
         fetchLeads();
         showToast('🎉 SUCCESS! Lead converted to dynamic Deal Card!');
+        router.push('/dashboard/deals');
       } else {
         setFormError(data.error || 'Failed to convert lead.');
       }
@@ -544,6 +554,13 @@ export default function LeadsPage() {
   const handleEditLead = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    const trimmedEditEmail = editLeadEmail.trim();
+    if (trimmedEditEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEditEmail)) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+
     setActionLoading(true);
 
     const leadData = {
@@ -1962,10 +1979,11 @@ export default function LeadsPage() {
                             )}
                             {fieldDef.field_type === 'number' && (
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
                                 placeholder={fieldDef.placeholder || ''}
                                 value={orgCustomFieldValues[fieldDef.field_key] || ''}
-                                onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                onChange={(e) => setOrgCustomFieldValues(prev => ({ ...prev, [fieldDef.field_key]: e.target.value.replace(/\D/g, '') }))}
                                 className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
                               />
                             )}
@@ -2053,7 +2071,7 @@ export default function LeadsPage() {
                         type="text"
                         placeholder="+91 99999 88888"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                         className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 placeholder-slate-400 transition"
                       />
                     </div>
@@ -2069,7 +2087,7 @@ export default function LeadsPage() {
                           type="text"
                           placeholder="E.g. 9876543210"
                           value={whatsapp}
-                          onChange={(e) => setWhatsapp(e.target.value)}
+                          onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, ''))}
                           className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-855 placeholder-slate-400 transition"
                         />
                       </div>
@@ -2237,10 +2255,11 @@ export default function LeadsPage() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Estimated Revenue (₹)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         placeholder="E.g. 500000"
                         value={annualRevenue}
-                        onChange={(e) => setAnnualRevenue(e.target.value)}
+                        onChange={(e) => setAnnualRevenue(e.target.value.replace(/\D/g, ''))}
                         className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                       />
                     </div>
@@ -2297,10 +2316,11 @@ export default function LeadsPage() {
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Total Employee Count</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           placeholder="E.g. 150"
                           value={employeeCount}
-                          onChange={(e) => setEmployeeCount(e.target.value)}
+                          onChange={(e) => setEmployeeCount(e.target.value.replace(/\D/g, ''))}
                           className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                         />
                       </div>
@@ -2474,10 +2494,11 @@ export default function LeadsPage() {
                             )}
                             {fieldDef.field_type === 'number' && (
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
                                 placeholder={fieldDef.placeholder || ''}
                                 value={editLeadCustomData[fieldDef.field_key] || ''}
-                                onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value }))}
+                                onChange={(e) => setEditLeadCustomData(prev => ({ ...prev, [fieldDef.field_key]: e.target.value.replace(/\D/g, '') }))}
                                 className={`w-full ${IconComponent ? 'pl-9 pr-3' : 'px-3'} py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition`}
                               />
                             )}
@@ -2556,7 +2577,7 @@ export default function LeadsPage() {
                       type="tel"
                       placeholder="E.g. +91 9876543210"
                       value={editLeadPhone}
-                      onChange={(e) => setEditLeadPhone(e.target.value)}
+                      onChange={(e) => setEditLeadPhone(e.target.value.replace(/\D/g, ''))}
                       className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                     />
                   </div>
@@ -2567,7 +2588,7 @@ export default function LeadsPage() {
                         type="tel"
                         placeholder="E.g. +91 9876543210"
                         value={editLeadWhatsapp}
-                        onChange={(e) => setEditLeadWhatsapp(e.target.value)}
+                        onChange={(e) => setEditLeadWhatsapp(e.target.value.replace(/\D/g, ''))}
                         className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                       />
                     </div>
@@ -2736,10 +2757,11 @@ export default function LeadsPage() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Estimated Revenue (₹)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         placeholder="E.g. 500000"
                         value={editLeadAnnualRevenue}
-                        onChange={(e) => setEditLeadAnnualRevenue(e.target.value)}
+                        onChange={(e) => setEditLeadAnnualRevenue(e.target.value.replace(/\D/g, ''))}
                         className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                       />
                     </div>
@@ -2782,10 +2804,11 @@ export default function LeadsPage() {
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Total Employee Count</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           placeholder="E.g. 150"
                           value={editLeadEmployeeCount}
-                          onChange={(e) => setEditLeadEmployeeCount(e.target.value)}
+                          onChange={(e) => setEditLeadEmployeeCount(e.target.value.replace(/\D/g, ''))}
                           className="w-full px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none text-xs text-slate-800 transition"
                         />
                       </div>

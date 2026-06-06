@@ -26,6 +26,11 @@ const DealSchema = new mongoose.Schema(
       ref: 'Lead',
       default: null,
     },
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ClientOrganization',
+      default: null,
+    },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

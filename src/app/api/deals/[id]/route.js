@@ -1,5 +1,6 @@
 import connectToDatabase from '@/lib/db';
 import Deal from '@/lib/models/Deal';
+import ClientOrganization from '@/lib/models/ClientOrganization';
 import { supabase } from '@/lib/supabaseClient';
 import { mapDealToFrontend } from '@/lib/dbMapper';
 import { getUserFromRequest } from '@/lib/auth';
@@ -18,7 +19,7 @@ export async function PUT(req, { params }) {
     if (supabase) {
       const { data: deal, error: fetchError } = await supabase
         .from('deals')
-        .select('*')
+        .select('*, client_organizations(*)')
         .eq('id', id)
         .maybeSingle();
 
@@ -40,7 +41,7 @@ export async function PUT(req, { params }) {
       }
 
       const body = await req.json();
-      const { title, value, stage, closingDate, assignedTo, customData } = body;
+      const { title, value, stage, closingDate, assignedTo, organizationId, company, customData } = body;
 
       // Build updates list
       const updates = {};
@@ -67,11 +68,51 @@ export async function PUT(req, { params }) {
         updates.assigned_to = assignedTo;
       }
 
+      // Find or create Client Organization in Supabase if company name changed
+      let finalOrgId = organizationId;
+      if (finalOrgId === undefined && company !== undefined && company.trim() !== (deal.company || '')) {
+        if (company.trim() === '') {
+          finalOrgId = null;
+        } else {
+          const companyName = company.trim();
+          const { data: existingOrg } = await supabase
+            .from('client_organizations')
+            .select('id')
+            .eq('org_id', decodedUser.orgId)
+            .ilike('name', companyName)
+            .maybeSingle();
+
+          if (existingOrg) {
+            finalOrgId = existingOrg.id;
+          } else {
+            const { data: newOrg } = await supabase
+              .from('client_organizations')
+              .insert([
+                {
+                  org_id: decodedUser.orgId,
+                  name: companyName,
+                  assigned_to: updates.assigned_to !== undefined ? updates.assigned_to : deal.assigned_to,
+                  custom_data: {}
+                }
+              ])
+              .select('id')
+              .single();
+            if (newOrg) finalOrgId = newOrg.id;
+          }
+        }
+      }
+      if (finalOrgId !== undefined) {
+        updates.organization_id = finalOrgId;
+      }
+      if (company !== undefined) {
+        updates.company = company.trim();
+      }
+
       const { data: updatedDeal, error: updateError } = await supabase
         .from('deals')
         .update(updates)
         .eq('id', id)
-        .select('*, users(id, name, email)')
+        .select('*, users(id, name, email), client_organizations(*)')
         .single();
 
       if (updateError) {
@@ -103,7 +144,7 @@ export async function PUT(req, { params }) {
       }
 
       const body = await req.json();
-      const { title, value, stage, closingDate, assignedTo } = body;
+      const { title, value, stage, closingDate, assignedTo, organizationId, company } = body;
 
       // Build updates list
       const updates = {};
@@ -129,11 +170,43 @@ export async function PUT(req, { params }) {
         updates.assignedTo = assignedTo;
       }
 
+      // Find or create Client Organization in Mongoose if company name changed
+      let finalOrgId = organizationId;
+      if (finalOrgId === undefined && company !== undefined && company.trim() !== (deal.company || '')) {
+        if (company.trim() === '') {
+          finalOrgId = null;
+        } else {
+          const companyName = company.trim();
+          let existingOrg = await ClientOrganization.findOne({
+            orgId: decodedUser.orgId,
+            name: { $regex: new RegExp(`^${companyName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+          });
+
+          if (existingOrg) {
+            finalOrgId = existingOrg._id;
+          } else {
+            const newOrg = await ClientOrganization.create({
+              orgId: decodedUser.orgId,
+              name: companyName,
+              assignedTo: updates.assignedTo !== undefined ? updates.assignedTo : deal.assignedTo,
+              customData: {}
+            });
+            finalOrgId = newOrg._id;
+          }
+        }
+      }
+      if (finalOrgId !== undefined) {
+        updates.organizationId = finalOrgId;
+      }
+      if (company !== undefined) {
+        updates.company = company.trim();
+      }
+
       const updatedDeal = await Deal.findByIdAndUpdate(
         id,
         { $set: updates },
         { new: true, runValidators: true }
-      ).populate('assignedTo', 'name email');
+      ).populate('assignedTo', 'name email').populate('organizationId');
 
       return NextResponse.json({
         success: true,

@@ -100,6 +100,37 @@ export function mapNotificationToFrontend(notification) {
   };
 }
 
+export function mapClientOrgToFrontend(org) {
+  if (!org) return null;
+  return {
+    _id: org.id || org._id,
+    id: org.id || org._id,
+    orgId: org.org_id || org.orgId,
+    name: org.name,
+    website: org.website || '',
+    industry: org.industry || '',
+    phone: org.phone || '',
+    email: org.email || '',
+    city: org.city || '',
+    state: org.state || '',
+    country: org.country || 'India',
+    assignedTo: org.users ? {
+      _id: org.users.id,
+      id: org.users.id,
+      name: org.users.name,
+      email: org.users.email
+    } : (org.assignedTo ? {
+      _id: org.assignedTo._id || org.assignedTo.id || org.assignedTo,
+      id: org.assignedTo._id || org.assignedTo.id || org.assignedTo,
+      name: org.assignedTo.name || '',
+      email: org.assignedTo.email || ''
+    } : null),
+    customData: org.custom_data || org.customData || {},
+    createdAt: org.created_at || org.createdAt,
+    updatedAt: org.updated_at || org.updatedAt,
+  };
+}
+
 export function mapContactToFrontend(contact) {
   if (!contact) return null;
   return {
@@ -122,6 +153,24 @@ export function mapContactToFrontend(contact) {
       email: contact.users.email
     } : null,
     leadId: contact.lead_id || null,
+    organizationId: contact.organization_id || (contact.organizationId?._id || contact.organizationId || null),
+    organization: contact.client_organizations 
+      ? mapClientOrgToFrontend(contact.client_organizations) 
+      : ((contact.organizationId && typeof contact.organizationId === 'object' && contact.organizationId.name)
+        ? {
+            _id: contact.organizationId._id,
+            id: contact.organizationId._id,
+            name: contact.organizationId.name,
+            website: contact.organizationId.website || '',
+            industry: contact.organizationId.industry || '',
+            phone: contact.organizationId.phone || '',
+            email: contact.organizationId.email || '',
+            city: contact.organizationId.city || '',
+            state: contact.organizationId.state || '',
+            country: contact.organizationId.country || 'India',
+            customData: contact.organizationId.customData || {},
+          }
+        : null),
     status: contact.status || 'Active',
     customData: contact.custom_data || {},
     createdAt: contact.created_at,
@@ -139,6 +188,24 @@ export function mapDealToFrontend(deal) {
     stage: deal.stage || 'Prospecting',
     closingDate: deal.closing_date,
     leadId: deal.lead_id || null,
+    organizationId: deal.organization_id || (deal.organizationId?._id || deal.organizationId || null),
+    organization: deal.client_organizations 
+      ? mapClientOrgToFrontend(deal.client_organizations) 
+      : ((deal.organizationId && typeof deal.organizationId === 'object' && deal.organizationId.name)
+        ? {
+            _id: deal.organizationId._id,
+            id: deal.organizationId._id,
+            name: deal.organizationId.name,
+            website: deal.organizationId.website || '',
+            industry: deal.organizationId.industry || '',
+            phone: deal.organizationId.phone || '',
+            email: deal.organizationId.email || '',
+            city: deal.organizationId.city || '',
+            state: deal.organizationId.state || '',
+            country: deal.organizationId.country || 'India',
+            customData: deal.organizationId.customData || {},
+          }
+        : null),
     assignedTo: deal.users ? {
       _id: deal.users.id,
       id: deal.users.id,

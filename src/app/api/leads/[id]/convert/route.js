@@ -3,6 +3,7 @@ import Lead from '@/lib/models/Lead';
 import Deal from '@/lib/models/Deal';
 import Contact from '@/lib/models/Contact';
 import Task from '@/lib/models/Task';
+import ClientOrganization from '@/lib/models/ClientOrganization';
 import { supabase } from '@/lib/supabaseClient';
 import { mapDealToFrontend, mapContactToFrontend } from '@/lib/dbMapper';
 import { getUserFromRequest } from '@/lib/auth';
@@ -81,6 +82,48 @@ export async function POST(req, { params }) {
         }
       }
 
+      // Find or create Client Organization
+      let organizationId = null;
+      if (lead.company && lead.company.trim()) {
+        const companyName = lead.company.trim();
+        const { data: existingOrg, error: orgFindError } = await supabase
+          .from('client_organizations')
+          .select('id')
+          .eq('org_id', lead.org_id)
+          .ilike('name', companyName)
+          .maybeSingle();
+
+        if (orgFindError) {
+          console.error('Supabase find client organization error:', orgFindError);
+        }
+
+        if (existingOrg) {
+          organizationId = existingOrg.id;
+        } else {
+          const { data: newOrg, error: orgCreateError } = await supabase
+            .from('client_organizations')
+            .insert([
+              {
+                org_id: lead.org_id,
+                name: companyName,
+                city: lead.city || '',
+                state: lead.state || '',
+                country: lead.country || 'India',
+                assigned_to: targetAssignedTo,
+                custom_data: lead.custom_data || {}
+              }
+            ])
+            .select('id')
+            .single();
+
+          if (orgCreateError) {
+            console.error('Supabase create client organization error:', orgCreateError);
+          } else if (newOrg) {
+            organizationId = newOrg.id;
+          }
+        }
+      }
+
       // 1. Create the Deal card in Supabase
       const { data: newDeal, error: dealError } = await supabase
         .from('deals')
@@ -91,6 +134,7 @@ export async function POST(req, { params }) {
             stage: firstStage, // Dynamically set first pipeline stage of the sector
             closing_date: new Date(closingDate).toISOString(),
             lead_id: lead.id,
+            organization_id: organizationId,
             assigned_to: targetAssignedTo, // Assign to current rep or owner
             company: lead.company,
             contact_email: lead.email || '',
@@ -122,6 +166,7 @@ export async function POST(req, { params }) {
             city: lead.city || '',
             state: lead.state || '',
             country: lead.country || 'India',
+            organization_id: organizationId,
             assigned_to: targetAssignedTo,
             lead_id: lead.id,
             status: 'Active',
@@ -203,6 +248,37 @@ export async function POST(req, { params }) {
 
       const targetAssignedTo = lead.assignedTo || decodedUser.id;
 
+      // Find or create Client Organization in Mongoose
+      let organizationId = null;
+      if (lead.company && lead.company.trim()) {
+        const companyName = lead.company.trim();
+        let existingOrg = await ClientOrganization.findOne({
+          orgId: lead.orgId,
+          name: { $regex: new RegExp(`^${companyName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+        });
+
+        if (existingOrg) {
+          organizationId = existingOrg._id;
+        } else {
+          const customFieldsData = {};
+          if (lead.customFields && Array.isArray(lead.customFields)) {
+            lead.customFields.forEach(f => {
+              customFieldsData[f.label] = f.value;
+            });
+          }
+          const newOrg = await ClientOrganization.create({
+            orgId: lead.orgId,
+            name: companyName,
+            city: lead.city || '',
+            state: lead.state || '',
+            country: lead.country || 'India',
+            assignedTo: targetAssignedTo,
+            customData: customFieldsData
+          });
+          organizationId = newOrg._id;
+        }
+      }
+
       // 2. Create the Deal card in Mongoose
       const newDeal = await Deal.create({
         title: dealTitle.trim(),
@@ -210,6 +286,7 @@ export async function POST(req, { params }) {
         stage: 'Prospecting', // New deals start at Prospecting stage
         closingDate: new Date(closingDate),
         leadId: lead._id,
+        organizationId: organizationId,
         assignedTo: targetAssignedTo, // Assign to current rep or owner
         company: lead.company,
         contactEmail: lead.email,
@@ -229,6 +306,7 @@ export async function POST(req, { params }) {
         city: lead.city || '',
         state: lead.state || '',
         country: lead.country || 'India',
+        organizationId: organizationId,
         assignedTo: targetAssignedTo,
         leadId: lead._id,
         status: 'Active',

@@ -13,20 +13,47 @@ import {
   PlusCircle,
   Loader2,
   Building,
+  Building2,
   Target,
   Trophy,
   Award,
   Zap,
-  Crown
+  Crown,
+  Receipt
 } from 'lucide-react';
 
 export default function DashboardSummaryPage() {
   const [stats, setStats] = useState({
+    // Leads
     totalLeads: 0,
+    newLeads: 0,
+    convertedLeads: 0,
     activeLeads: 0,
+    
+    // Deals
+    activeDeals: 0,
+    wonDeals: 0,
+    lostDeals: 0,
+    dealValue: 0,
     totalDeals: 0,
     pipelineValuation: 0,
     wonValuation: 0,
+    
+    // Clients
+    totalClients: 0,
+    newClientsThisMonth: 0,
+    
+    // Revenue
+    monthlyRevenue: 0,
+    received: 0,
+    pending: 0,
+    
+    // Invoices
+    totalInvoices: 0,
+    paidInvoices: 0,
+    pendingInvoices: 0,
+    overdueInvoices: 0,
+    
     conversionRate: 0
   });
   const [recentLeads, setRecentLeads] = useState([]);
@@ -34,13 +61,24 @@ export default function DashboardSummaryPage() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
+  // Raw cached data collections for dynamic client-side filtering
+  const [rawLeads, setRawLeads] = useState([]);
+  const [rawDeals, setRawDeals] = useState([]);
+  const [rawOrgs, setRawOrgs] = useState([]);
+  const [rawInvoices, setRawInvoices] = useState([]);
+  
+  // Dashboard time filter selector state
+  const [timeFilter, setTimeFilter] = useState('monthly'); // 'daily' | 'weekly' | 'monthly'
+
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const [meRes, leadsRes, dealsRes] = await Promise.all([
+        const [meRes, leadsRes, dealsRes, orgsRes, invoicesRes] = await Promise.all([
           fetch('/api/auth/me'),
           fetch('/api/leads'),
-          fetch('/api/deals')
+          fetch('/api/deals'),
+          fetch('/api/client-organizations'),
+          fetch('/api/invoices')
         ]);
 
         if (meRes.ok) {
@@ -48,40 +86,34 @@ export default function DashboardSummaryPage() {
           setCurrentUser(meData.user);
         }
 
-        if (leadsRes.ok && dealsRes.ok) {
+        let allLeads = [];
+        let allDeals = [];
+        let allOrgs = [];
+        let allInvoices = [];
+
+        if (leadsRes.ok) {
           const leadsData = await leadsRes.json();
-          const dealsData = await dealsRes.json();
-
-          const allLeads = leadsData.leads || [];
-          const allDeals = dealsData.deals || [];
-
-          const totalL = allLeads.length;
-          const activeL = allLeads.filter(l => l.status !== 'Lost' && l.status !== 'Qualified').length;
-          const qualifiedL = allLeads.filter(l => l.status === 'Qualified').length;
-
-          const totalD = allDeals.length;
-          const activePipelineVal = allDeals
-            .filter(d => d.stage !== 'Won' && d.stage !== 'Lost')
-            .reduce((sum, d) => sum + d.value, 0);
-
-          const wonVal = allDeals
-            .filter(d => d.stage === 'Won')
-            .reduce((sum, d) => sum + d.value, 0);
-
-          const convRate = totalL > 0 ? Math.round((qualifiedL / totalL) * 100) : 0;
-
-          setStats({
-            totalLeads: totalL,
-            activeLeads: activeL,
-            totalDeals: totalD,
-            pipelineValuation: activePipelineVal,
-            wonValuation: wonVal,
-            conversionRate: convRate
-          });
-
-          setRecentLeads(allLeads.slice(0, 4));
-          setRecentDeals(allDeals.slice(0, 4));
+          allLeads = leadsData.leads || [];
+          setRawLeads(allLeads);
         }
+        if (dealsRes.ok) {
+          const dealsData = await dealsRes.json();
+          allDeals = dealsData.deals || [];
+          setRawDeals(allDeals);
+        }
+        if (orgsRes.ok) {
+          const orgsData = await orgsRes.json();
+          allOrgs = orgsData.organizations || [];
+          setRawOrgs(allOrgs);
+        }
+        if (invoicesRes.ok) {
+          const invoicesData = await invoicesRes.json();
+          allInvoices = invoicesData.invoices || [];
+          setRawInvoices(allInvoices);
+        }
+
+        setRecentLeads(allLeads.slice(0, 4));
+        setRecentDeals(allDeals.slice(0, 4));
       } catch (err) {
         console.error('Fetch dashboard stats failed:', err);
       } finally {
@@ -91,6 +123,121 @@ export default function DashboardSummaryPage() {
 
     fetchDashboardData();
   }, []);
+
+  // Compute dynamic stats based on chosen timeFilter
+  useEffect(() => {
+    if (loading) return;
+
+    const now = new Date();
+    
+    // Day bounds
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    
+    // Week bounds (Sunday to Saturday)
+    const currentDay = now.getDay();
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - currentDay, 0, 0, 0, 0);
+    const endOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - currentDay + 6, 23, 59, 59, 999);
+    
+    // Month bounds
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    let startDate, endDate;
+    if (timeFilter === 'daily') {
+      startDate = startOfToday;
+      endDate = endOfToday;
+    } else if (timeFilter === 'weekly') {
+      startDate = startOfWeek;
+      endDate = endOfWeek;
+    } else {
+      startDate = startOfMonth;
+      endDate = endOfMonth;
+    }
+
+    // Filter Leads
+    const filteredLeads = rawLeads.filter(l => {
+      const created = new Date(l.createdAt);
+      return created >= startDate && created <= endDate;
+    });
+    const totalL = filteredLeads.length;
+    const newL = filteredLeads.filter(l => l.status === 'New').length;
+    const convertedL = filteredLeads.filter(l => l.status === 'Qualified' || l.status === 'Converted').length;
+    const activeL = filteredLeads.filter(l => l.status !== 'Lost' && l.status !== 'Qualified' && l.status !== 'Converted').length;
+
+    // Filter Deals
+    const filteredDeals = rawDeals.filter(d => {
+      const created = new Date(d.createdAt);
+      return created >= startDate && created <= endDate;
+    });
+    const activeD = filteredDeals.filter(d => d.stage !== 'Won' && d.stage !== 'Lost').length;
+    const wonD = filteredDeals.filter(d => d.stage === 'Won').length;
+    const lostD = filteredDeals.filter(d => d.stage === 'Lost').length;
+    
+    const activePipelineVal = filteredDeals
+      .filter(d => d.stage !== 'Won' && d.stage !== 'Lost')
+      .reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+      
+    const wonVal = filteredDeals
+      .filter(d => d.stage === 'Won')
+      .reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+
+    // Filter Client Accounts
+    const filteredOrgs = rawOrgs.filter(org => {
+      const created = new Date(org.createdAt);
+      return created >= startDate && created <= endDate;
+    });
+    const totalClients = filteredOrgs.length;
+    const newClientsThisMonth = filteredOrgs.length; // clients registered in this timeframe are new to it
+
+    // Filter Revenue/Invoices
+    const filteredInvoices = rawInvoices.filter(inv => {
+      const created = new Date(inv.createdAt);
+      return created >= startDate && created <= endDate;
+    });
+    const monthlyRevenue = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
+    const received = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.amountPaid) || 0), 0);
+    const pending = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.balanceDue) || 0), 0);
+
+    // Invoices
+    const totalInvoices = filteredInvoices.length;
+    const paidInvoices = filteredInvoices.filter(inv => inv.status === 'Paid').length;
+    const pendingInvoices = filteredInvoices.filter(inv => inv.status === 'Unpaid' || inv.status === 'Partially Paid').length;
+    const overdueInvoices = filteredInvoices.filter(inv => {
+      return inv.status !== 'Paid' && inv.dueDate && new Date(inv.dueDate) < now;
+    }).length;
+
+    const convRate = rawLeads.length > 0 ? Math.round((rawLeads.filter(l => l.status === 'Qualified' || l.status === 'Converted').length / rawLeads.length) * 100) : 0;
+
+    setStats({
+      totalLeads: totalL,
+      newLeads: newL,
+      convertedLeads: convertedL,
+      activeLeads: activeL,
+      
+      activeDeals: activeD,
+      wonDeals: wonD,
+      lostDeals: lostD,
+      dealValue: activePipelineVal,
+      totalDeals: filteredDeals.length,
+      pipelineValuation: activePipelineVal,
+      wonValuation: wonVal,
+      
+      totalClients,
+      newClientsThisMonth,
+      
+      monthlyRevenue,
+      received,
+      pending,
+      
+      totalInvoices,
+      paidInvoices,
+      pendingInvoices,
+      overdueInvoices,
+      
+      conversionRate: convRate
+    });
+  }, [rawLeads, rawDeals, rawOrgs, rawInvoices, timeFilter, loading]);
 
   if (loading) {
     return (
@@ -103,6 +250,12 @@ export default function DashboardSummaryPage() {
 
   const formatCurrency = (val) => {
     return '₹' + val.toLocaleString('en-IN');
+  };
+
+  const getFilterLabel = () => {
+    if (timeFilter === 'daily') return 'Today';
+    if (timeFilter === 'weekly') return 'This Week';
+    return 'This Month';
   };
 
   const isRep = currentUser?.role === 'sales_rep';
@@ -128,7 +281,41 @@ export default function DashboardSummaryPage() {
             </p>
           </div>
           
-          <div className="flex gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            {/* Filter Toggle */}
+            <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 shadow-sm">
+              <button
+                onClick={() => setTimeFilter('daily')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                  timeFilter === 'daily'
+                    ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                    : 'text-slate-500 hover:text-slate-800 border border-transparent'
+                }`}
+              >
+                Daily
+              </button>
+              <button
+                onClick={() => setTimeFilter('weekly')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                  timeFilter === 'weekly'
+                    ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                    : 'text-slate-500 hover:text-slate-800 border border-transparent'
+                }`}
+              >
+                Weekly
+              </button>
+              <button
+                onClick={() => setTimeFilter('monthly')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                  timeFilter === 'monthly'
+                    ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                    : 'text-slate-500 hover:text-slate-800 border border-transparent'
+                }`}
+              >
+                Monthly
+              </button>
+            </div>
+
             <Link
               href="/dashboard/leads"
               className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-350 text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer"
@@ -147,52 +334,101 @@ export default function DashboardSummaryPage() {
         </div>
 
         {/* --- DYNAMIC METRICS CARDS FOR REPS --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Active Leads */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">My Active Leads</span>
-              <span className="text-2xl font-black text-slate-800 block">{stats.activeLeads}</span>
-              <span className="text-[9px] text-slate-400 block font-semibold">Total Assigned: {stats.totalLeads}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in duration-300">
+          {/* Leads Summary */}
+          <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Leads Overview</span>
+                <span className="text-xl font-black text-slate-800 block">Total Leads: {stats.totalLeads}</span>
+              </div>
+              <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600 border border-blue-100">
+                <Users className="h-5.5 w-5.5" />
+              </div>
             </div>
-            <div className="p-3.5 bg-blue-50 rounded-xl text-blue-600 border border-blue-100">
-              <Users className="h-5 w-5" />
-            </div>
-          </div>
-
-          {/* Active Pipeline Valuation */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">My Deals Pipeline</span>
-              <span className="text-2xl font-black text-amber-600 block">{formatCurrency(stats.pipelineValuation)}</span>
-              <span className="text-[9px] text-slate-400 block font-semibold">Deals in Pipeline: {stats.totalDeals}</span>
-            </div>
-            <div className="p-3.5 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-          </div>
-
-          {/* Closed Won Revenue */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Closed Won Revenue</span>
-              <span className="text-2xl font-black text-emerald-600 block">{formatCurrency(stats.wonValuation)}</span>
-              <span className="text-[9px] text-slate-400 block font-semibold">Your Secured Deals Billing</span>
-            </div>
-            <div className="p-3.5 bg-emerald-50 rounded-xl text-emerald-600 border border-emerald-100">
-              <CheckCircle className="h-5 w-5" />
+            <div className="space-y-2 text-xs font-semibold text-slate-655">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-450">New Leads</span>
+                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold">{stats.newLeads}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-455">Converted Leads</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">{stats.convertedLeads}</span>
+              </div>
             </div>
           </div>
 
-          {/* Conversion Rate */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">My Conversion Rate</span>
-              <span className="text-2xl font-black text-indigo-650 block">{stats.conversionRate}%</span>
-              <span className="text-[9px] text-slate-400 block font-semibold">Lead to Qualified Deal Ratio</span>
+          {/* Deals Summary */}
+          <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Deals Pipeline</span>
+                <span className="text-xl font-black text-slate-800 block">Active Deals: {stats.activeDeals}</span>
+              </div>
+              <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">
+                <Briefcase className="h-5.5 w-5.5" />
+              </div>
             </div>
-            <div className="p-3.5 bg-indigo-50 rounded-xl text-indigo-650 border border-indigo-100">
-              <Target className="h-5 w-5" />
+            <div className="space-y-2 text-xs font-semibold text-slate-655">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-450">Won | Lost Deals</span>
+                <span className="font-bold text-slate-700">
+                  Won: <span className="text-emerald-600">{stats.wonDeals}</span> | Lost: <span className="text-rose-600">{stats.lostDeals}</span>
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+                <span className="text-slate-450">Active Deal Value</span>
+                <span className="font-black text-slate-800">{formatCurrency(stats.dealValue)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Clients Summary */}
+          <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Client Accounts</span>
+                <span className="text-xl font-black text-slate-800 block">Total Clients: {stats.totalClients}</span>
+              </div>
+              <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600 border border-emerald-100">
+                <Building2 className="h-5.5 w-5.5" />
+              </div>
+            </div>
+            <div className="space-y-2 text-xs font-semibold text-slate-655">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-450">New ({getFilterLabel()})</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">{stats.newClientsThisMonth}</span>
+              </div>
+              <div className="flex justify-between items-center pt-5.5 text-[10px] text-slate-400 font-medium italic">
+                * Corporate isolation enabled
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue Summary */}
+          <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{getFilterLabel()} Revenue</span>
+                <span className="text-xl font-black text-slate-800 block">{formatCurrency(stats.monthlyRevenue)}</span>
+              </div>
+              <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600 border border-indigo-100">
+                <Receipt className="h-5.5 w-5.5" />
+              </div>
+            </div>
+            <div className="space-y-2 text-xs font-semibold text-slate-655">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-450">Received | Pending</span>
+                <span className="font-bold text-slate-700">
+                  <span className="text-emerald-600">{formatCurrency(stats.received)}</span> | <span className="text-amber-500">{formatCurrency(stats.pending)}</span>
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-t border-slate-100 pt-2 text-[10px]">
+                <span className="text-slate-400 font-bold">Invoices: {stats.totalInvoices} total</span>
+                <span className="text-slate-450 font-bold">
+                  Paid: <span className="text-emerald-600">{stats.paidInvoices}</span> | Pnd: <span className="text-amber-500">{stats.pendingInvoices}</span> | Ovd: <span className="text-rose-600">{stats.overdueInvoices}</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -482,7 +718,41 @@ export default function DashboardSummaryPage() {
         </div>
         
         {/* Quick Actions Shortcuts */}
-        <div className="flex gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+          {/* Filter Toggle */}
+          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 shadow-sm">
+            <button
+              onClick={() => setTimeFilter('daily')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                timeFilter === 'daily'
+                  ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                  : 'text-slate-500 hover:text-slate-800 border border-transparent'
+              }`}
+            >
+              Daily
+            </button>
+            <button
+              onClick={() => setTimeFilter('weekly')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                timeFilter === 'weekly'
+                  ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                  : 'text-slate-500 hover:text-slate-800 border border-transparent'
+              }`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setTimeFilter('monthly')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                timeFilter === 'monthly'
+                  ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                  : 'text-slate-500 hover:text-slate-800 border border-transparent'
+              }`}
+            >
+              Monthly
+            </button>
+          </div>
+
           <Link
             href="/dashboard/leads"
             className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-350 text-xs font-bold text-slate-700 shadow-sm transition"
@@ -492,7 +762,7 @@ export default function DashboardSummaryPage() {
           </Link>
           <Link
             href="/dashboard/deals"
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold shadow-md shadow-emerald-500/10 transition"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-450 text-white text-xs font-bold shadow-md shadow-emerald-500/10 transition"
           >
             Go to Sales Pipeline
             <ArrowRight className="h-3.5 w-3.5 text-white" />
@@ -501,52 +771,101 @@ export default function DashboardSummaryPage() {
       </div>
 
       {/* --- ANALYTICS STATS METRIC GRID --- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Active Leads */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Leads</span>
-            <span className="text-2xl font-black text-slate-800 block">{stats.activeLeads}</span>
-            <span className="text-[9px] text-slate-400 block font-semibold">Total registered: {stats.totalLeads}</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in duration-350">
+        {/* Leads Summary */}
+        <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+          <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Leads Overview</span>
+              <span className="text-xl font-black text-slate-800 block">Total Leads: {stats.totalLeads}</span>
+            </div>
+            <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600 border border-blue-100">
+              <Users className="h-5.5 w-5.5" />
+            </div>
           </div>
-          <div className="p-3.5 bg-blue-50 rounded-xl text-blue-600 border border-blue-100">
-            <Users className="h-5 w-5" />
-          </div>
-        </div>
-
-        {/* Active Pipeline Valuation */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Pipeline</span>
-            <span className="text-2xl font-black text-amber-600 block">{formatCurrency(stats.pipelineValuation)}</span>
-            <span className="text-[9px] text-slate-400 block font-semibold">Active deals in stage: {stats.totalDeals}</span>
-          </div>
-          <div className="p-3.5 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">
-            <TrendingUp className="h-5 w-5" />
-          </div>
-        </div>
-
-        {/* Revenue Closed Won */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Closed Won Revenue</span>
-            <span className="text-2xl font-black text-emerald-600 block">{formatCurrency(stats.wonValuation)}</span>
-            <span className="text-[9px] text-slate-400 block font-semibold">100% Secured and paid</span>
-          </div>
-          <div className="p-3.5 bg-emerald-50 rounded-xl text-emerald-600 border border-emerald-100">
-            <CheckCircle className="h-5 w-5" />
+          <div className="space-y-2 text-xs font-semibold text-slate-655">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-450">New Leads</span>
+              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold">{stats.newLeads}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-455">Converted Leads</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">{stats.convertedLeads}</span>
+            </div>
           </div>
         </div>
 
-        {/* Conversion Rate */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Conversion Performance</span>
-            <span className="text-2xl font-black text-indigo-650 block">{stats.conversionRate}%</span>
-            <span className="text-[9px] text-slate-400 block font-semibold">Lead-to-Deal Conversion</span>
+        {/* Deals Summary */}
+        <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+          <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Deals Pipeline</span>
+              <span className="text-xl font-black text-slate-800 block">Active Deals: {stats.activeDeals}</span>
+            </div>
+            <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">
+              <Briefcase className="h-5.5 w-5.5" />
+            </div>
           </div>
-          <div className="p-3.5 bg-indigo-50 rounded-xl text-indigo-650 border border-indigo-100">
-            <Target className="h-5 w-5" />
+          <div className="space-y-2 text-xs font-semibold text-slate-655">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-450">Won | Lost Deals</span>
+              <span className="font-bold text-slate-700">
+                Won: <span className="text-emerald-600">{stats.wonDeals}</span> | Lost: <span className="text-rose-600">{stats.lostDeals}</span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+              <span className="text-slate-455">Active Deal Value</span>
+              <span className="font-black text-slate-800">{formatCurrency(stats.dealValue)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Clients Summary */}
+        <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+          <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Client Accounts</span>
+              <span className="text-xl font-black text-slate-800 block">Total Clients: {stats.totalClients}</span>
+            </div>
+            <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600 border border-emerald-100">
+              <Building2 className="h-5.5 w-5.5" />
+            </div>
+          </div>
+          <div className="space-y-2 text-xs font-semibold text-slate-655">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-450">New ({getFilterLabel()})</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">{stats.newClientsThisMonth}</span>
+            </div>
+            <div className="flex justify-between items-center pt-5.5 text-[10px] text-slate-400 font-medium italic">
+              * Decoupled corporate accounts
+            </div>
+          </div>
+        </div>
+
+        {/* Revenue Summary */}
+        <div className="p-5.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+          <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{getFilterLabel()} Revenue</span>
+              <span className="text-xl font-black text-slate-800 block">{formatCurrency(stats.monthlyRevenue)}</span>
+            </div>
+            <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600 border border-indigo-100">
+              <Receipt className="h-5.5 w-5.5" />
+            </div>
+          </div>
+          <div className="space-y-2 text-xs font-semibold text-slate-655">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-450">Received | Pending</span>
+              <span className="font-bold text-slate-700">
+                <span className="text-emerald-600">{formatCurrency(stats.received)}</span> | <span className="text-amber-500">{formatCurrency(stats.pending)}</span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-t border-slate-100 pt-2 text-[10px]">
+              <span className="text-slate-400 font-bold">Invoices: {stats.totalInvoices} total</span>
+              <span className="text-slate-455 font-bold">
+                Paid: <span className="text-emerald-600">{stats.paidInvoices}</span> | Pnd: <span className="text-amber-500">{stats.pendingInvoices}</span> | Ovd: <span className="text-rose-600">{stats.overdueInvoices}</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
